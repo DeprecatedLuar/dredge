@@ -12,7 +12,7 @@ import (
 
 // Color constants (24-bit RGB ANSI escape codes)
 // Official Dredge palette: #671e1b #85322d #5b3540 #2a8773 #237455 + cream #fdffdf
-// Visual hierarchy: Content (cream) > Title (bright teal) > ID (rust) > Tags (desaturated)
+// Visual hierarchy: Content (cream) > Title (bright teal) > ID (rust) > Tags
 const (
 	ColorID      = "\033[38;2;133;50;45m"   // #85322d - rust/copper for IDs
 	ColorTitle   = "\033[38;2;60;180;150m"  // Brightened teal for titles (high contrast)
