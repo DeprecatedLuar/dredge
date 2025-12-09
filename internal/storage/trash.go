@@ -16,9 +16,6 @@ const (
 	// Trash file naming
 	trashItemPrefix = "dredge-"
 	trashInfoExt    = ".trashinfo"
-
-	// Cache files
-	lastDeletedCacheFile = "/tmp/dredge-last-deleted-"
 )
 
 // GetTrashDir returns the system trash directory path
@@ -68,11 +65,6 @@ func GetTrashInfoPath(id string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(trashInfoDir, trashItemPrefix+id+trashInfoExt), nil
-}
-
-// GetLastDeletedCachePath returns the path for last deleted cache file
-func GetLastDeletedCachePath() string {
-	return lastDeletedCacheFile + fmt.Sprint(os.Getppid())
 }
 
 // EnsureTrashDirectories creates the trash directory structure if it doesn't exist
@@ -139,13 +131,6 @@ func MoveToTrash(id string) error {
 		return fmt.Errorf("failed to create .trashinfo file: %w", err)
 	}
 
-	// Cache last deleted ID
-	cacheFile := GetLastDeletedCachePath()
-	if err := os.WriteFile(cacheFile, []byte(id), 0600); err != nil {
-		// Non-fatal, just warn
-		fmt.Fprintf(os.Stderr, "Warning: failed to cache last deleted ID: %v\n", err)
-	}
-
 	return nil
 }
 
@@ -189,17 +174,4 @@ func RestoreFromTrash(id string) error {
 	}
 
 	return nil
-}
-
-// GetLastDeletedID reads the last deleted item ID from cache
-func GetLastDeletedID() (string, error) {
-	cacheFile := GetLastDeletedCachePath()
-	data, err := os.ReadFile(cacheFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("no recent deletion found")
-		}
-		return "", fmt.Errorf("failed to read last deleted cache: %w", err)
-	}
-	return string(data), nil
 }

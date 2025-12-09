@@ -31,12 +31,6 @@ const (
 	Argon2KeyLength = 32        // 32 bytes for AES-256
 )
 
-// Session cache configuration
-const (
-	SessionCacheDir  = "/tmp"
-	SessionCacheFile = ".sk-%d" // %d = $PPID (obscured name for security)
-	CachePermissions = 0600     // User-only read/write
-)
 
 // Password verification
 const (
@@ -183,11 +177,21 @@ func DeriveKey(password string, salt []byte) []byte {
 // Session Management
 // ============================================================================
 
-// GetCachedPassword retrieves the cached password from /tmp/.sk-$PPID.
+// Session cache configuration
+const (
+	tempDirBase      = "/tmp/dredge"
+	sessionCacheFile = ".session" // Hidden file for security
+)
+
+// getSessionDir returns the session-specific directory path
+func getSessionDir() string {
+	return filepath.Join(tempDirBase, fmt.Sprintf("%d", os.Getppid()))
+}
+
+// GetCachedPassword retrieves the cached password from session cache.
 // Returns empty string if cache doesn't exist.
 func GetCachedPassword() (string, error) {
-	ppid := os.Getppid()
-	cachePath := fmt.Sprintf("%s/%s", SessionCacheDir, fmt.Sprintf(SessionCacheFile, ppid))
+	cachePath := filepath.Join(getSessionDir(), sessionCacheFile)
 
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
@@ -200,32 +204,29 @@ func GetCachedPassword() (string, error) {
 	return string(data), nil
 }
 
-// CachePassword stores the password in /tmp/.sk-$PPID with 0600 permissions.
+// CachePassword stores the password in session cache.
 func CachePassword(password string) error {
 	if password == "" {
 		return fmt.Errorf("password cannot be empty")
 	}
 
-	ppid := os.Getppid()
-	cachePath := fmt.Sprintf("%s/%s", SessionCacheDir, fmt.Sprintf(SessionCacheFile, ppid))
+	// Ensure session directory exists
+	sessionDir := getSessionDir()
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		return fmt.Errorf("failed to create session directory: %w", err)
+	}
 
-	if err := os.WriteFile(cachePath, []byte(password), CachePermissions); err != nil {
+	cachePath := filepath.Join(sessionDir, sessionCacheFile)
+	if err := os.WriteFile(cachePath, []byte(password), 0600); err != nil {
 		return fmt.Errorf("failed to cache password: %w", err)
 	}
 
 	return nil
 }
 
-// ClearSession removes the session cache file.
+// ClearSession removes the session cache (not currently used, kept for compatibility).
 func ClearSession() error {
-	ppid := os.Getppid()
-	cachePath := fmt.Sprintf("%s/%s", SessionCacheDir, fmt.Sprintf(SessionCacheFile, ppid))
-
-	err := os.Remove(cachePath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to clear session: %w", err)
-	}
-
+	// Session cache is per-terminal and auto-cleans on exit, so this is optional
 	return nil
 }
 

@@ -1,9 +1,7 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/search"
@@ -12,8 +10,7 @@ import (
 )
 
 const (
-	resultsCache   = "/tmp/dredge-results-%d" // %d = $PPID
-	smartThreshold = 2.5                       // Top score must be 2.5x higher than second to auto-view
+	smartThreshold = 2.5 // Top score must be 2.5x higher than second to auto-view
 )
 
 func HandleSearch(query string, luck bool, forceSearch bool) error {
@@ -89,44 +86,35 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 	}
 
 	// Cache results for numbered access
-	cacheResults(results)
+	resultIDs := make([]string, len(results))
+	for i, r := range results {
+		resultIDs[i] = r.ID
+	}
+	storage.CacheResults(resultIDs) // Ignore errors (non-fatal)
 
 	return nil
 }
 
-// cacheResults saves search results to /tmp for numbered access
-func cacheResults(results []search.Result) {
-	ids := make([]string, len(results))
-	for i, r := range results {
-		ids[i] = r.ID
+// ResolveArgs converts numbered args to IDs using cached search results
+// Non-numeric args are passed through as-is (assumed to be IDs)
+func ResolveArgs(args []string) ([]string, error) {
+	resolved := make([]string, len(args))
+
+	for i, arg := range args {
+		// Try parsing as number
+		var num int
+		if _, err := fmt.Sscanf(arg, "%d", &num); err == nil && num > 0 {
+			// It's a number, resolve from cache
+			id, cacheErr := storage.GetCachedResult(num)
+			if cacheErr != nil {
+				return nil, fmt.Errorf("arg %q: %w", arg, cacheErr)
+			}
+			resolved[i] = id
+		} else {
+			// Not a number, assume it's an ID
+			resolved[i] = arg
+		}
 	}
 
-	data, err := json.Marshal(ids)
-	if err != nil {
-		return // Non-fatal, just skip caching
-	}
-
-	cachePath := fmt.Sprintf(resultsCache, os.Getppid())
-	_ = os.WriteFile(cachePath, data, 0600) // Ignore errors
-}
-
-// GetCachedResult retrieves the ID for a numbered search result
-func GetCachedResult(num int) (string, error) {
-	cachePath := fmt.Sprintf(resultsCache, os.Getppid())
-
-	data, err := os.ReadFile(cachePath)
-	if err != nil {
-		return "", fmt.Errorf("no recent search results")
-	}
-
-	var ids []string
-	if err := json.Unmarshal(data, &ids); err != nil {
-		return "", fmt.Errorf("invalid search cache")
-	}
-
-	if num < 1 || num > len(ids) {
-		return "", fmt.Errorf("result number out of range (1-%d)", len(ids))
-	}
-
-	return ids[num-1], nil
+	return resolved, nil
 }

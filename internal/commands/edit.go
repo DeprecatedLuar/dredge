@@ -12,17 +12,28 @@ import (
 )
 
 const (
-	tempFilePrefix = "dredge-edit-"
+	tempDirBase    = "/tmp/dredge"
+	tempFilePrefix = "edit-"
 	tempFileSuffix = ".txt"
 	defaultEditor  = "vim"
 )
+
+// getSessionDir returns the session-specific directory path
+func getSessionDir() string {
+	return fmt.Sprintf("%s/%d", tempDirBase, os.Getppid())
+}
 
 func HandleEdit(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("usage: dredge edit <id>")
 	}
 
-	id := args[0]
+	// Resolve numbered arg to ID
+	ids, err := ResolveArgs(args)
+	if err != nil {
+		return err
+	}
+	id := ids[0]
 
 	// Get password
 	password, err := crypto.GetPasswordWithVerification()
@@ -39,8 +50,14 @@ func HandleEdit(args []string) error {
 	// Convert item to template format
 	templateContent := itemToTemplate(item)
 
-	// Create temp file
-	tempFile, err := os.CreateTemp("", tempFilePrefix+"*"+tempFileSuffix)
+	// Ensure session directory exists
+	sessionDir := getSessionDir()
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		return fmt.Errorf("failed to create session directory: %w", err)
+	}
+
+	// Create temp file in session directory
+	tempFile, err := os.CreateTemp(sessionDir, tempFilePrefix+"*"+tempFileSuffix)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}

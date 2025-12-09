@@ -57,5 +57,12 @@ func HandleList(args []string) error {
 		fmt.Println(ui.FormatItem(entry.id, entry.item.Title, entry.item.Tags, "it#"))
 	}
 
+	// Cache IDs for numbered access
+	cachedIDs := make([]string, len(entries))
+	for i, entry := range entries {
+		cachedIDs[i] = entry.id
+	}
+	storage.CacheResults(cachedIDs) // Ignore errors (non-fatal)
+
 	return nil
 }

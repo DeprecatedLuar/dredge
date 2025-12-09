@@ -13,7 +13,12 @@ func HandleView(args []string) error {
 		return fmt.Errorf("usage: dredge view <id>")
 	}
 
-	id := args[0]
+	// Resolve numbered arg to ID
+	ids, err := ResolveArgs(args[:1])
+	if err != nil {
+		return err
+	}
+	id := ids[0]
 
 	// Get password with verification
 	password, err := crypto.GetPasswordWithVerification()

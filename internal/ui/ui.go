@@ -14,6 +14,9 @@ import (
 const (
 	ColorTag   = "\033[38;2;128;128;128m" // Muted gray for tags
 	ColorReset = "\033[0m"                // Reset to default
+
+	StyleStrikethrough = "\033[9m"  // Strikethrough text
+	StyleReset         = "\033[29m" // Reset strikethrough
 )
 
 // Terminal defaults
@@ -110,28 +113,43 @@ func FormatTags(tags []string) string {
 
 // FormatItem formats item components based on what parts are requested.
 // parts: "i" = id, "t" = title, "#" = tags
-// Examples: "it#" = [id] title #tags, "it" = [id] title, "t#" = title #tags
+// Modifiers: "-" prefix = strikethrough, "+" prefix = normal (no-op)
+// Examples: "it#" = [id] title #tags, "-it" = strikethrough [id] title, "+it#" = [id] title #tags
 func FormatItem(id, title string, tags []string, parts string) string {
+	// Check for strikethrough modifier
+	strikethrough := false
+	if len(parts) > 0 && parts[0] == '-' {
+		strikethrough = true
+		parts = parts[1:] // Strip modifier
+	} else if len(parts) > 0 && parts[0] == '+' {
+		parts = parts[1:] // Strip no-op modifier
+	}
+
 	var result strings.Builder
+
+	// Apply strikethrough if requested
+	if strikethrough {
+		result.WriteString(StyleStrikethrough)
+	}
 
 	for _, char := range parts {
 		switch char {
 		case 'i':
-			if result.Len() > 0 {
+			if result.Len() > 0 && result.String()[result.Len()-1] != '\033' {
 				result.WriteString(" ")
 			}
 			result.WriteString("[")
 			result.WriteString(id)
 			result.WriteString("]")
 		case 't':
-			if result.Len() > 0 {
+			if result.Len() > 0 && result.String()[result.Len()-1] != '\033' {
 				result.WriteString(" ")
 			}
 			result.WriteString(title)
 		case '#':
 			tagStr := FormatTags(tags)
 			if tagStr != "" {
-				if result.Len() > 0 {
+				if result.Len() > 0 && result.String()[result.Len()-1] != '\033' {
 					result.WriteString(" ")
 				}
 				result.WriteString(ColorTag)
@@ -139,6 +157,11 @@ func FormatItem(id, title string, tags []string, parts string) string {
 				result.WriteString(ColorReset)
 			}
 		}
+	}
+
+	// Reset strikethrough if applied
+	if strikethrough {
+		result.WriteString(StyleReset)
 	}
 
 	return result.String()
