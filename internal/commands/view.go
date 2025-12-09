@@ -37,10 +37,10 @@ func HandleView(args []string) error {
 		fmt.Printf("%s[%s]%s %s%s%s\n", ui.ColorID, id, ui.ColorReset, ui.ColorTitle, item.Title, ui.ColorReset)
 	}
 
-	// Print content (green)
+	// Print content (cream)
 	if item.Content.Text != "" {
 		fmt.Println()
-		fmt.Printf("%s%s%s\n", ui.ColorTitle, item.Content.Text, ui.ColorReset)
+		fmt.Printf("%s%s%s\n", ui.ColorContent, item.Content.Text, ui.ColorReset)
 	}
 
 	return nil

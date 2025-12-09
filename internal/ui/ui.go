@@ -11,11 +11,14 @@ import (
 )
 
 // Color constants (24-bit RGB ANSI escape codes)
+// Official Dredge palette: #671e1b #85322d #5b3540 #2a8773 #237455 + cream #fdffdf
+// Visual hierarchy: Content (cream) > Title (bright teal) > ID (rust) > Tags (desaturated)
 const (
-	ColorID    = "\033[38;2;136;136;136m" // #888888 - medium gray for IDs
-	ColorTitle = "\033[38;2;159;212;159m" // #9fd49f - bright green for titles
-	ColorTag   = "\033[38;2;97;97;97m"    // #616161 - dark gray for tags
-	ColorReset = "\033[0m"                // Reset to default
+	ColorID      = "\033[38;2;133;50;45m"   // #85322d - rust/copper for IDs
+	ColorTitle   = "\033[38;2;60;180;150m"  // Brightened teal for titles (high contrast)
+	ColorTag     = "\033[38;2;80;80;80m"    // Desaturated gray for tags (least prominent)
+	ColorContent = "\033[38;2;253;255;223m" // #fdffdf - cream for content (highest priority)
+	ColorReset   = "\033[0m"                // Reset to default
 )
 
 // Terminal defaults
