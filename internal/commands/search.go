@@ -4,27 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/search"
 	"github.com/DeprecatedLuar/dredge/internal/storage"
-	"golang.org/x/term"
+	"github.com/DeprecatedLuar/dredge/internal/ui"
 )
 
 const (
-	resultsCache       = "/tmp/dredge-results-%d" // %d = $PPID
-	smartThreshold     = 2.5                       // Top score must be 2.5x higher than second to auto-view
-	defaultTermWidth   = 80                        // Default if terminal width can't be detected
-	ellipsisLen        = 3                         // Length of "..." for truncation
-	minTruncateLen     = 10                        // Minimum useful length before truncation
-	tagSpacing         = 5                         // Reserve space between title and tags
-
-	// Colors (24-bit RGB)
-	idColor            = "\033[38;2;136;136;136m"  // #888888 - medium gray for IDs
-	titleColor         = "\033[38;2;159;212;159m"  // #9fd49f - bright green for titles
-	tagColor           = "\033[38;2;97;97;97m"     // #616161 - neutral dark gray for tags
-	resetColor         = "\033[0m"                 // Reset color
+	resultsCache     = "/tmp/dredge-results-%d" // %d = $PPID
+	smartThreshold   = 2.5                       // Top score must be 2.5x higher than second to auto-view
+	ellipsisLen      = 3                         // Length of "..." for truncation
+	minTruncateLen   = 10                        // Minimum useful length before truncation
+	tagSpacing       = 5                         // Reserve space between title and tags
 )
 
 func HandleSearch(query string, luck bool, forceSearch bool) error {
@@ -95,7 +87,7 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 	}
 
 	// Show list with tags
-	termWidth := getTerminalWidth()
+	termWidth := ui.GetTerminalWidth()
 	for _, result := range results {
 		printResult(result, termWidth)
 	}
@@ -106,29 +98,13 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 	return nil
 }
 
-// getTerminalWidth returns the current terminal width, or default if unavailable
-func getTerminalWidth() int {
-	width, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil || width <= 0 {
-		return defaultTermWidth
-	}
-	return width
-}
-
 // printResult prints a search result with ID, title, and dimmed tags
 // Format: [ID] Title #tag1 #tag2 #tag3
 // Truncates if needed to fit terminal width
 func printResult(result search.Result, termWidth int) {
 	id := result.ID
 	title := result.Item.Title
-	tags := result.Item.Tags
-
-	// Build tag string with # prefix
-	var tagParts []string
-	for _, tag := range tags {
-		tagParts = append(tagParts, "#"+tag)
-	}
-	tagStr := strings.Join(tagParts, " ")
+	tagStr := ui.FormatTags(result.Item.Tags)
 
 	// Format: [ID] Title #tags (with colors)
 	plainPrefix := fmt.Sprintf("[%s] ", id)
@@ -137,7 +113,7 @@ func printResult(result search.Result, termWidth int) {
 	// Build full line
 	var line string
 	if len(tagStr) > 0 {
-		fullText := fmt.Sprintf("%s%s%s %s%s%s", titleColor, title, resetColor, tagColor, tagStr, resetColor)
+		fullText := fmt.Sprintf("%s%s%s %s%s%s", ui.ColorTitle, title, ui.ColorReset, ui.ColorTag, tagStr, ui.ColorReset)
 		plainText := fmt.Sprintf("%s %s", title, tagStr)
 
 		// Check if truncation needed (use plain text length for calculation)
@@ -152,12 +128,12 @@ func printResult(result search.Result, termWidth int) {
 			if len(title) <= maxLen-tagSpacing {
 				// Title fits, truncate tags
 				remaining := maxLen - len(title) - 1
-				truncatedTags := truncateString(tagStr, remaining)
-				line = fmt.Sprintf("%s%s%s %s%s...%s", titleColor, title, resetColor, tagColor, truncatedTags, resetColor)
+				truncatedTags := ui.TruncateString(tagStr, remaining)
+				line = fmt.Sprintf("%s%s%s %s%s...%s", ui.ColorTitle, title, ui.ColorReset, ui.ColorTag, truncatedTags, ui.ColorReset)
 			} else {
 				// Truncate title only
-				truncatedTitle := truncateString(title, maxLen)
-				line = fmt.Sprintf("%s%s...%s", titleColor, truncatedTitle, resetColor)
+				truncatedTitle := ui.TruncateString(title, maxLen)
+				line = fmt.Sprintf("%s%s...%s", ui.ColorTitle, truncatedTitle, ui.ColorReset)
 			}
 		} else {
 			line = fullText
@@ -165,23 +141,14 @@ func printResult(result search.Result, termWidth int) {
 	} else {
 		// No tags
 		if len(title) > availableWidth {
-			truncatedTitle := truncateString(title, availableWidth-ellipsisLen)
-			line = fmt.Sprintf("%s%s...%s", titleColor, truncatedTitle, resetColor)
+			truncatedTitle := ui.TruncateString(title, availableWidth-ellipsisLen)
+			line = fmt.Sprintf("%s%s...%s", ui.ColorTitle, truncatedTitle, ui.ColorReset)
 		} else {
-			line = fmt.Sprintf("%s%s%s", titleColor, title, resetColor)
+			line = fmt.Sprintf("%s%s%s", ui.ColorTitle, title, ui.ColorReset)
 		}
 	}
 
-	fmt.Printf("%s[%s]%s %s\n", idColor, id, resetColor, line)
-}
-
-// truncateString truncates a string to maxLen runes (Unicode-safe)
-func truncateString(s string, maxLen int) string {
-	runes := []rune(s)
-	if len(runes) <= maxLen {
-		return s
-	}
-	return string(runes[:maxLen])
+	fmt.Printf("%s[%s]%s %s\n", ui.ColorID, id, ui.ColorReset, line)
 }
 
 // cacheResults saves search results to /tmp for numbered access

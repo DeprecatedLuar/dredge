@@ -6,9 +6,18 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/DeprecatedLuar/dredge/internal/ui"
 )
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 // Encryption constants
 const (
@@ -21,6 +30,23 @@ const (
 	Argon2Threads   = 4         // 4 parallel threads
 	Argon2KeyLength = 32        // 32 bytes for AES-256
 )
+
+// Session cache configuration
+const (
+	SessionCacheDir  = "/tmp"
+	SessionCacheFile = ".sk-%d" // %d = $PPID (obscured name for security)
+	CachePermissions = 0600     // User-only read/write
+)
+
+// Password verification
+const (
+	PasswordVerifyFile  = ".dredge-key"
+	VerificationContent = "dredge-vault-v1"
+)
+
+// ============================================================================
+// Core Encryption Functions
+// ============================================================================
 
 // Encrypt encrypts plaintext using password-derived key (Argon2id + AES-256-GCM).
 // Returns binary format: [16B salt][12B nonce][N bytes ciphertext + 16B auth tag]
@@ -151,4 +177,234 @@ func DeriveKey(password string, salt []byte) []byte {
 		Argon2Threads,
 		Argon2KeyLength,
 	)
+}
+
+// ============================================================================
+// Session Management
+// ============================================================================
+
+// GetCachedPassword retrieves the cached password from /tmp/.sk-$PPID.
+// Returns empty string if cache doesn't exist.
+func GetCachedPassword() (string, error) {
+	ppid := os.Getppid()
+	cachePath := fmt.Sprintf("%s/%s", SessionCacheDir, fmt.Sprintf(SessionCacheFile, ppid))
+
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil // Cache doesn't exist, not an error
+		}
+		return "", fmt.Errorf("failed to read session cache: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// CachePassword stores the password in /tmp/.sk-$PPID with 0600 permissions.
+func CachePassword(password string) error {
+	if password == "" {
+		return fmt.Errorf("password cannot be empty")
+	}
+
+	ppid := os.Getppid()
+	cachePath := fmt.Sprintf("%s/%s", SessionCacheDir, fmt.Sprintf(SessionCacheFile, ppid))
+
+	if err := os.WriteFile(cachePath, []byte(password), CachePermissions); err != nil {
+		return fmt.Errorf("failed to cache password: %w", err)
+	}
+
+	return nil
+}
+
+// ClearSession removes the session cache file.
+func ClearSession() error {
+	ppid := os.Getppid()
+	cachePath := fmt.Sprintf("%s/%s", SessionCacheDir, fmt.Sprintf(SessionCacheFile, ppid))
+
+	err := os.Remove(cachePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to clear session: %w", err)
+	}
+
+	return nil
+}
+
+// HasActiveSession checks if a session cache exists for current terminal.
+func HasActiveSession() bool {
+	password, err := GetCachedPassword()
+	return err == nil && password != ""
+}
+
+// GetPPID returns the parent process ID (for debugging/testing).
+func GetPPID() string {
+	return strconv.Itoa(os.Getppid())
+}
+
+// ============================================================================
+// Password Verification
+// ============================================================================
+
+// GetVerifyFilePath returns the full path to the password verification file
+func GetVerifyFilePath() (string, error) {
+	// Use XDG_DATA_HOME or default to ~/.local/share
+	baseDir := os.Getenv("XDG_DATA_HOME")
+	if baseDir == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		baseDir = filepath.Join(homeDir, ".local", "share")
+	}
+
+	dredgeDir := filepath.Join(baseDir, "dredge")
+	return filepath.Join(dredgeDir, PasswordVerifyFile), nil
+}
+
+// PasswordVerificationExists checks if the .dredge-key file exists
+func PasswordVerificationExists() bool {
+	path, err := GetVerifyFilePath()
+	if err != nil {
+		return false
+	}
+
+	_, err = os.Stat(path)
+	return err == nil
+}
+
+// CreatePasswordVerification creates the .dredge-key file with the given password
+func CreatePasswordVerification(password string) error {
+	if password == "" {
+		return fmt.Errorf("password cannot be empty")
+	}
+
+	path, err := GetVerifyFilePath()
+	if err != nil {
+		return fmt.Errorf("failed to get verify file path: %w", err)
+	}
+
+	// Ensure parent directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Encrypt the verification content
+	encrypted, err := Encrypt([]byte(VerificationContent), password)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt verification data: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(path, encrypted, 0600); err != nil {
+		return fmt.Errorf("failed to write verification file: %w", err)
+	}
+
+	return nil
+}
+
+// VerifyPassword attempts to decrypt .dredge-key with the given password
+// Returns nil if password is correct, error otherwise
+func VerifyPassword(password string) error {
+	if password == "" {
+		return fmt.Errorf("password cannot be empty")
+	}
+
+	path, err := GetVerifyFilePath()
+	if err != nil {
+		return fmt.Errorf("failed to get verify file path: %w", err)
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return fmt.Errorf("password verification file not found (run 'dredge add' to create vault)")
+	}
+
+	// Read encrypted data
+	encrypted, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read verification file: %w", err)
+	}
+
+	// Try to decrypt WITHOUT using session cache
+	// We need to verify THIS specific password, not fall back to cache
+	// So we temporarily clear cache, decrypt, then restore if needed
+	cachedPassword, _ := GetCachedPassword()
+	_ = ClearSession() // Clear cache temporarily
+
+	decrypted, err := Decrypt(encrypted, password)
+
+	// Restore cache if there was one (and it's different from test password)
+	if cachedPassword != "" && cachedPassword != password {
+		_ = CachePassword(cachedPassword)
+	}
+
+	if err != nil {
+		// Decryption failed = wrong password
+		return fmt.Errorf("wrong password")
+	}
+
+	// Verify content matches expected value
+	if string(decrypted) != VerificationContent {
+		return fmt.Errorf("verification file corrupted (expected %q, got %q)", VerificationContent, string(decrypted))
+	}
+
+	return nil
+}
+
+// GetPasswordWithVerification prompts for password and verifies it against .dredge-key
+// If .dredge-key doesn't exist, creates it with the entered password
+func GetPasswordWithVerification() (string, error) {
+	// Check session cache first
+	cached, err := GetCachedPassword()
+	if err != nil {
+		return "", fmt.Errorf("failed to check password cache: %w", err)
+	}
+
+	if cached != "" {
+		// If .dredge-key exists, verify the cached password
+		// If it doesn't exist yet, just use the cached password
+		if PasswordVerificationExists() {
+			if err := VerifyPassword(cached); err != nil {
+				// Cache is invalid, clear it
+				_ = ClearSession()
+			} else {
+				return cached, nil
+			}
+		} else {
+			// No verification file yet, use cached password
+			return cached, nil
+		}
+	}
+
+	// No valid cached password, prompt user
+	password, err := ui.PromptPassword()
+	if err != nil {
+		return "", fmt.Errorf("failed to prompt for password: %w", err)
+	}
+
+	if password == "" {
+		return "", fmt.Errorf("password cannot be empty")
+	}
+
+	// Check if verification file exists
+	if !PasswordVerificationExists() {
+		// First time - create verification file
+		if err := CreatePasswordVerification(password); err != nil {
+			return "", fmt.Errorf("failed to create password verification: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "Created password verification file")
+	} else {
+		// Verify password
+		if err := VerifyPassword(password); err != nil {
+			return "", err
+		}
+	}
+
+	// Cache the verified password
+	if err := CachePassword(password); err != nil {
+		// Non-fatal: just warn
+		fmt.Fprintf(os.Stderr, "Warning: failed to cache password: %v\n", err)
+	}
+
+	return password, nil
 }
