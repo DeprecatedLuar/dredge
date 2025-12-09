@@ -18,6 +18,7 @@ const (
 	ColorTitle   = "\033[38;2;60;180;150m"  // Brightened teal for titles (high contrast)
 	ColorTag     = "\033[38;2;80;80;80m"    // Desaturated gray for tags (least prominent)
 	ColorContent = "\033[38;2;253;255;223m" // #fdffdf - cream for content (highest priority)
+	ColorDeleted = "\033[38;2;91;53;64m"    // #5b3540 - muted purple for deleted items
 	ColorReset   = "\033[0m"                // Reset to default
 )
 

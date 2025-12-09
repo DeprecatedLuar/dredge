@@ -27,9 +27,9 @@ const (
 	spawnedDirName = ".spawned"
 
 	// File names
-	linksFileName    = "links.json"
+	linksFileName     = "links.json"
 	gitignoreFileName = ".gitignore"
-	itemFileExt      = ""
+	itemFileExt       = ""
 
 	// Permissions
 	dirPermissions      = 0700 // rwx------
@@ -351,3 +351,4 @@ func ItemExists(id string) (bool, error) {
 	}
 	return false, fmt.Errorf("failed to check item existence: %w", err)
 }
+

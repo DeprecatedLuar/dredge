@@ -119,6 +119,13 @@ func main() {
 				},
 			},
 			{
+				Name:  "undo",
+				Usage: "Restore last deleted item",
+				Action: func(c *cli.Context) error {
+					return commands.HandleUndo(c.Args().Slice())
+				},
+			},
+			{
 				Name:    "link",
 				Aliases: []string{"ln"},
 				Usage:   "Link an item to a system path",
