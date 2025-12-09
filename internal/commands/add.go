@@ -24,8 +24,6 @@ func generateID() (string, error) {
 }
 
 func HandleAdd(id, title, content string, tags []string) error {
-	debugf("HandleAdd called: id=%q title=%q content=%q tags=%v", id, title, content, tags)
-
 	if title == "" {
 		return fmt.Errorf("title cannot be empty")
 	}

@@ -131,11 +131,17 @@ func GetPasswordWithVerification() (string, error) {
 	}
 
 	if cached != "" {
-		// Verify cached password is still correct
-		if err := VerifyPassword(cached); err != nil {
-			// Cache is invalid, clear it
-			_ = ClearSession()
+		// If .dredge-key exists, verify the cached password
+		// If it doesn't exist yet, just use the cached password
+		if PasswordVerificationExists() {
+			if err := VerifyPassword(cached); err != nil {
+				// Cache is invalid, clear it
+				_ = ClearSession()
+			} else {
+				return cached, nil
+			}
 		} else {
+			// No verification file yet, use cached password
 			return cached, nil
 		}
 	}

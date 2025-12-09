@@ -29,7 +29,7 @@ const (
 	// File names
 	linksFileName    = "links.json"
 	gitignoreFileName = ".gitignore"
-	itemFileExt      = ".toml"
+	itemFileExt      = ""
 
 	// Permissions
 	dirPermissions      = 0700 // rwx------

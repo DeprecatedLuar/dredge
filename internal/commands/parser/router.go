@@ -3,23 +3,59 @@ package parser
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/DeprecatedLuar/dredge/internal/commands"
+	"github.com/DeprecatedLuar/dredge/internal/crypto"
+)
+
+var debugMode bool
+
+func Debugf(format string, args ...any) {
+	if debugMode {
+		fmt.Printf("[DEBUG] "+format+"\n", args...)
+	}
+}
+
+var (
+	luckMode   bool
+	searchMode bool
 )
 
 func Route(args []string) {
-	debugMode := false
+	password := ""
+	luckMode = false
+	searchMode = false
 	filteredArgs := make([]string, 0, len(args))
 
-	for _, arg := range args {
+	// Parse flags
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		if arg == "--debug" {
 			debugMode = true
+		} else if arg == "--password" || arg == "-p" {
+			if i+1 < len(args) {
+				password = args[i+1]
+				i++ // Skip next arg (the password value)
+			}
+		} else if arg == "--luck" || arg == "-l" {
+			luckMode = true
+		} else if arg == "--search" || arg == "-s" {
+			searchMode = true
 		} else {
 			filteredArgs = append(filteredArgs, arg)
 		}
 	}
 
-	commands.SetDebugMode(debugMode)
+	// If password provided via flag, cache it immediately
+	if password != "" {
+		Debugf("Caching password from --password flag: %s", password)
+		if err := crypto.CachePassword(password); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to cache password: %v\n", err)
+		} else {
+			Debugf("Password cached successfully")
+		}
+	}
 
 	if len(filteredArgs) == 0 {
 		commands.HandleHelp(nil)
@@ -34,7 +70,9 @@ func Route(args []string) {
 	case "add", "new", "+", "a":
 		err = handleAddCommand(cmdArgs)
 	case "search", "s":
-		err = commands.HandleSearch(cmdArgs)
+		// Join all args into a single search query
+		query := JoinArgs(append([]string{}, cmdArgs...))
+		err = commands.HandleSearch(query, luckMode, searchMode)
 	case "view", "v":
 		err = commands.HandleView(cmdArgs)
 	case "edit", "e":
@@ -56,17 +94,32 @@ func Route(args []string) {
 	case "help", "h", "-h", "--help":
 		err = commands.HandleHelp(cmdArgs)
 	default:
-		// Smart query: if arg looks like an ID, view it; otherwise search
-		// This enables: dredge <id> or dredge <search-query>
-		query := cmd
-		if ValidateID(query) == nil {
-			// Valid ID format, try to view it
-			err = commands.HandleView([]string{query})
-		} else {
-			// Not a valid ID, treat as search query
-			allArgs := append([]string{query}, cmdArgs...)
-			err = commands.HandleSearch(allArgs)
+		// Smart query: numbered result → ID → search
+		// This enables: dredge 1, dredge <id>, or dredge <search-query>
+		allArgs := append([]string{cmd}, cmdArgs...)
+
+		// Try as numbered result first (if single numeric arg)
+		if len(cmdArgs) == 0 {
+			if num, parseErr := strconv.Atoi(cmd); parseErr == nil && num > 0 {
+				id, cacheErr := commands.GetCachedResult(num)
+				if cacheErr == nil {
+					err = commands.HandleView([]string{id})
+					return
+				}
+				// If cache miss, fall through to try as ID/search
+			}
+
+			// Try as direct ID
+			err = commands.HandleView([]string{cmd})
+			// If view succeeded, we're done
+			if err == nil {
+				return
+			}
 		}
+
+		// Fall back to search
+		query := JoinArgs(allArgs)
+		err = commands.HandleSearch(query, luckMode, searchMode)
 	}
 
 	if err != nil {
