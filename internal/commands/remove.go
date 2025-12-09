@@ -41,8 +41,7 @@ func HandleRemove(args []string) error {
 			return fmt.Errorf("failed to move item [%s] to trash: %w", id, err)
 		}
 
-		// Print strikethrough message in muted purple
-		fmt.Printf("\033[9m%s[%s] %s%s\n", ui.ColorDeleted, id, item.Title, ui.ColorReset)
+		fmt.Println(ui.FormatItem(id, item.Title, nil, "it"))
 	}
 
 	return nil

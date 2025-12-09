@@ -5,6 +5,7 @@ import (
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge/internal/ui"
 )
 
 func HandleUndo(args []string) error {
@@ -37,8 +38,6 @@ func HandleUndo(args []string) error {
 		return nil
 	}
 
-	// Print success message
-	fmt.Printf("+ [%s] %s\n", id, item.Title)
-
+	fmt.Println("+ " + ui.FormatItem(id, item.Title, item.Tags, "it#"))
 	return nil
 }

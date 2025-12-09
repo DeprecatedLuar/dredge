@@ -12,11 +12,8 @@ import (
 )
 
 const (
-	resultsCache     = "/tmp/dredge-results-%d" // %d = $PPID
-	smartThreshold   = 2.5                       // Top score must be 2.5x higher than second to auto-view
-	ellipsisLen      = 3                         // Length of "..." for truncation
-	minTruncateLen   = 10                        // Minimum useful length before truncation
-	tagSpacing       = 5                         // Reserve space between title and tags
+	resultsCache   = "/tmp/dredge-results-%d" // %d = $PPID
+	smartThreshold = 2.5                       // Top score must be 2.5x higher than second to auto-view
 )
 
 func HandleSearch(query string, luck bool, forceSearch bool) error {
@@ -86,69 +83,15 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 		return HandleView([]string{results[0].ID})
 	}
 
-	// Show list with tags
-	termWidth := ui.GetTerminalWidth()
+	// Show list
 	for _, result := range results {
-		printResult(result, termWidth)
+		fmt.Println(ui.FormatItem(result.ID, result.Item.Title, result.Item.Tags, "it#"))
 	}
 
 	// Cache results for numbered access
 	cacheResults(results)
 
 	return nil
-}
-
-// printResult prints a search result with ID, title, and dimmed tags
-// Format: [ID] Title #tag1 #tag2 #tag3
-// Truncates if needed to fit terminal width
-func printResult(result search.Result, termWidth int) {
-	id := result.ID
-	title := result.Item.Title
-	tagStr := ui.FormatTags(result.Item.Tags)
-
-	// Format: [ID] Title #tags (with colors)
-	plainPrefix := fmt.Sprintf("[%s] ", id)
-	availableWidth := termWidth - len(plainPrefix)
-
-	// Build full line
-	var line string
-	if len(tagStr) > 0 {
-		fullText := fmt.Sprintf("%s%s%s %s%s%s", ui.ColorTitle, title, ui.ColorReset, ui.ColorTag, tagStr, ui.ColorReset)
-		plainText := fmt.Sprintf("%s %s", title, tagStr)
-
-		// Check if truncation needed (use plain text length for calculation)
-		if len(plainText) > availableWidth {
-			// Truncate, leaving room for "..."
-			maxLen := availableWidth - ellipsisLen
-			if maxLen < minTruncateLen {
-				maxLen = minTruncateLen
-			}
-
-			// Try to keep title + some tags
-			if len(title) <= maxLen-tagSpacing {
-				// Title fits, truncate tags
-				remaining := maxLen - len(title) - 1
-				truncatedTags := ui.TruncateString(tagStr, remaining)
-				line = fmt.Sprintf("%s%s%s %s%s...%s", ui.ColorTitle, title, ui.ColorReset, ui.ColorTag, truncatedTags, ui.ColorReset)
-			} else {
-				// Truncate title only
-				truncatedTitle := ui.TruncateString(title, maxLen)
-				line = fmt.Sprintf("%s%s...%s", ui.ColorTitle, truncatedTitle, ui.ColorReset)
-			}
-		} else {
-			line = fullText
-		}
-	} else {
-		// No tags
-		if len(title) > availableWidth {
-			truncatedTitle := ui.TruncateString(title, availableWidth-ellipsisLen)
-			line = fmt.Sprintf("%s%s...%s", ui.ColorTitle, truncatedTitle, ui.ColorReset)
-		} else {
-			line = fmt.Sprintf("%s%s%s", ui.ColorTitle, title, ui.ColorReset)
-		}
-	}
-
-	fmt.Printf("%s[%s]%s %s\n", ui.ColorID, id, ui.ColorReset, line)
 }
 
 // cacheResults saves search results to /tmp for numbered access

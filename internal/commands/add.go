@@ -7,6 +7,7 @@ import (
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge/internal/ui"
 )
 
 const (
@@ -70,6 +71,6 @@ func HandleAdd(id, title, content string, tags []string) error {
 		return fmt.Errorf("failed to create item: %w", err)
 	}
 
-	fmt.Printf("Created item '%s'\n", id)
+	fmt.Println("+ " + ui.FormatItem(id, item.Title, item.Tags, "it#"))
 	return nil
 }

@@ -27,20 +27,13 @@ func HandleView(args []string) error {
 		return fmt.Errorf("failed to read item: %w", err)
 	}
 
-	// Format tags
-	tagStr := ui.FormatTags(item.Tags)
+	// Print [ID] Title #tags
+	fmt.Println(ui.FormatItem(id, item.Title, item.Tags, "it#"))
 
-	// Print [ID] Title #tags (same format as search)
-	if len(tagStr) > 0 {
-		fmt.Printf("%s[%s]%s %s%s%s %s%s%s\n", ui.ColorID, id, ui.ColorReset, ui.ColorTitle, item.Title, ui.ColorReset, ui.ColorTag, tagStr, ui.ColorReset)
-	} else {
-		fmt.Printf("%s[%s]%s %s%s%s\n", ui.ColorID, id, ui.ColorReset, ui.ColorTitle, item.Title, ui.ColorReset)
-	}
-
-	// Print content (cream)
+	// Print content
 	if item.Content.Text != "" {
 		fmt.Println()
-		fmt.Printf("%s%s%s\n", ui.ColorContent, item.Content.Text, ui.ColorReset)
+		fmt.Println(item.Content.Text)
 	}
 
 	return nil

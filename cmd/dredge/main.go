@@ -96,6 +96,14 @@ func main() {
 				},
 			},
 			{
+				Name:    "list",
+				Aliases: []string{"ls"},
+				Usage:   "List all items",
+				Action: func(c *cli.Context) error {
+					return commands.HandleList(c.Args().Slice())
+				},
+			},
+			{
 				Name:    "view",
 				Aliases: []string{"v"},
 				Usage:   "View an item by ID",

@@ -10,16 +10,10 @@ import (
 	"golang.org/x/term"
 )
 
-// Color constants (24-bit RGB ANSI escape codes)
-// Official Dredge palette: #671e1b #85322d #5b3540 #2a8773 #237455 + cream #fdffdf
-// Visual hierarchy: Content (cream) > Title (bright teal) > ID (rust) > Tags
+// Color constants
 const (
-	ColorID      = "\033[38;2;133;50;45m"   // #85322d - rust/copper for IDs
-	ColorTitle   = "\033[38;2;60;180;150m"  // Brightened teal for titles (high contrast)
-	ColorTag     = "\033[38;2;80;80;80m"    // Desaturated gray for tags (least prominent)
-	ColorContent = "\033[38;2;253;255;223m" // #fdffdf - cream for content (highest priority)
-	ColorDeleted = "\033[38;2;91;53;64m"    // #5b3540 - muted purple for deleted items
-	ColorReset   = "\033[0m"                // Reset to default
+	ColorTag   = "\033[38;2;128;128;128m" // Muted gray for tags
+	ColorReset = "\033[0m"                // Reset to default
 )
 
 // Terminal defaults
@@ -114,7 +108,38 @@ func FormatTags(tags []string) string {
 	return strings.Join(parts, " ")
 }
 
-// Colorize wraps text with the given color code and resets after.
-func Colorize(text, color string) string {
-	return color + text + ColorReset
+// FormatItem formats item components based on what parts are requested.
+// parts: "i" = id, "t" = title, "#" = tags
+// Examples: "it#" = [id] title #tags, "it" = [id] title, "t#" = title #tags
+func FormatItem(id, title string, tags []string, parts string) string {
+	var result strings.Builder
+
+	for _, char := range parts {
+		switch char {
+		case 'i':
+			if result.Len() > 0 {
+				result.WriteString(" ")
+			}
+			result.WriteString("[")
+			result.WriteString(id)
+			result.WriteString("]")
+		case 't':
+			if result.Len() > 0 {
+				result.WriteString(" ")
+			}
+			result.WriteString(title)
+		case '#':
+			tagStr := FormatTags(tags)
+			if tagStr != "" {
+				if result.Len() > 0 {
+					result.WriteString(" ")
+				}
+				result.WriteString(ColorTag)
+				result.WriteString(tagStr)
+				result.WriteString(ColorReset)
+			}
+		}
+	}
+
+	return result.String()
 }
