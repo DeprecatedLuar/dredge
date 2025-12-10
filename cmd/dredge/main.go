@@ -52,39 +52,10 @@ func main() {
 				Name:    "add",
 				Aliases: []string{"a", "new", "+"},
 				Usage:   "Add a new item",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:  "id",
-						Usage: "Custom ID for the item",
-					},
-					&cli.StringFlag{
-						Name:    "content",
-						Aliases: []string{"c"},
-						Usage:   "Content of the item",
-					},
-					&cli.StringSliceFlag{
-						Name:    "tags",
-						Aliases: []string{"t"},
-						Usage:   "Tags for the item",
-					},
-				},
 				Action: func(c *cli.Context) error {
-					if c.NArg() < 1 && c.String("id") == "" {
-						return fmt.Errorf("usage: dredge add [--id <id>] <title...> [-c <content...>] [-t <tag1> <tag2> ...]")
-					}
-
-					id := c.String("id")
-					content := c.String("content")
-					tags := c.StringSlice("tags")
-
-					// Title is remaining args
-					title := strings.Join(c.Args().Slice(), " ")
-
-					if title == "" && id == "" {
-						return fmt.Errorf("title is required")
-					}
-
-					return commands.HandleAdd(id, title, content, tags)
+					// No args: open empty editor
+					// With args: parse title/content/tags
+					return commands.HandleAdd(c.Args().Slice())
 				},
 			},
 			{
@@ -138,8 +109,21 @@ func main() {
 				Name:    "link",
 				Aliases: []string{"ln"},
 				Usage:   "Link an item to a system path",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "force",
+						Usage: "Overwrite existing file at target path",
+					},
+					&cli.BoolFlag{
+						Name:    "p",
+						Usage:   "Create parent directories if they don't exist",
+						Aliases: []string{"parents"},
+					},
+				},
 				Action: func(c *cli.Context) error {
-					return commands.HandleLink(c.Args().Slice())
+					force := c.Bool("force")
+					createParent := c.Bool("p")
+					return commands.HandleLink(c.Args().Slice(), force, createParent)
 				},
 			},
 			{
@@ -211,8 +195,10 @@ func main() {
 				}
 
 				// Try as direct ID
-				if err := commands.HandleView([]string{firstArg}); err == nil {
+				if viewErr := commands.HandleView([]string{firstArg}); viewErr == nil {
 					return nil
+				} else {
+					Debugf("HandleView failed, falling back to search: %v", viewErr)
 				}
 			}
 

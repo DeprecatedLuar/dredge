@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/search"
@@ -101,9 +102,9 @@ func ResolveArgs(args []string) ([]string, error) {
 	resolved := make([]string, len(args))
 
 	for i, arg := range args {
-		// Try parsing as number
-		var num int
-		if _, err := fmt.Sscanf(arg, "%d", &num); err == nil && num > 0 {
+		// Try parsing as number (strconv.Atoi requires entire string to be numeric)
+		// Limit to 1-2 digits to avoid IDs like "123xyz" or long numbers
+		if num, err := strconv.Atoi(arg); err == nil && num > 0 && len(arg) <= 2 {
 			// It's a number, resolve from cache
 			id, cacheErr := storage.GetCachedResult(num)
 			if cacheErr != nil {
@@ -111,7 +112,7 @@ func ResolveArgs(args []string) ([]string, error) {
 			}
 			resolved[i] = id
 		} else {
-			// Not a number, assume it's an ID
+			// Not a number or too long, assume it's an ID
 			resolved[i] = arg
 		}
 	}

@@ -228,6 +228,14 @@ func CreateItem(id string, item *Item, password string) error {
 
 // ReadItem reads an item from disk by ID (decrypts automatically)
 func ReadItem(id string, password string) (*Item, error) {
+	// If linked, sync spawned file changes before reading
+	if IsLinked(id) {
+		if err := syncItemIfNeeded(id, password); err != nil {
+			// Non-fatal: log warning but continue
+			fmt.Fprintf(os.Stderr, "Warning: sync failed for %s: %v\n", id, err)
+		}
+	}
+
 	itemPath, err := GetItemPath(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get item path: %w", err)
@@ -284,6 +292,16 @@ func UpdateItem(id string, item *Item, password string) error {
 
 	if err := os.WriteFile(itemPath, encryptedData, itemFilePermissions); err != nil {
 		return fmt.Errorf("failed to write item file: %w", err)
+	}
+
+	// If linked, update spawned file and manifest hash
+	if IsLinked(id) {
+		if err := UpdateSpawnedFile(id, item.Content.Text); err != nil {
+			return fmt.Errorf("failed to update spawned file: %w", err)
+		}
+		if err := UpdateManifestHash(id); err != nil {
+			return fmt.Errorf("failed to update manifest hash: %w", err)
+		}
 	}
 
 	return nil
