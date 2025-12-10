@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/search"
@@ -56,14 +57,17 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 	// 1. -l flag: always view top result
 	// 2. -s flag: always show list
 	// 3. Smart default: auto-view if clear winner, else list
+	// 4. Never auto-view file items (force list instead)
 	shouldAutoView := false
 
 	if luck {
 		// Force view top result
 		shouldAutoView = true
 	} else if !forceSearch {
-		// Smart threshold: auto-view if clear winner
-		if len(results) == 1 {
+		// Never auto-view file items (they don't have readable content)
+		if results[0].Item.Type == storage.TypeFile {
+			shouldAutoView = false
+		} else if len(results) == 1 {
 			// Only one result, definitely view it
 			shouldAutoView = true
 		} else if len(results) > 1 {
@@ -83,7 +87,15 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 
 	// Show list
 	for _, result := range results {
-		fmt.Println(ui.FormatItem(result.ID, result.Item.Title, result.Item.Tags, "it#"))
+		line := ui.FormatItem(result.ID, result.Item.Title, result.Item.Tags, "it#")
+
+		// Use angle brackets for file items
+		if result.Item.Type == storage.TypeFile {
+			// Replace [id] with <id>
+			line = strings.Replace(line, "["+result.ID+"]", "<"+result.ID+">", 1)
+		}
+
+		fmt.Println(line)
 	}
 
 	// Cache results for numbered access

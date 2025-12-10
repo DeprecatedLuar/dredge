@@ -4,7 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/editor"
@@ -26,37 +29,49 @@ func generateID() (string, error) {
 	return id[:idLength], nil
 }
 
-// parseAddArgs manually parses args to extract title, content, and tags
-// Supports flexible flag ordering: title can come first, -c and -t can be in any order
-func parseAddArgs(args []string) (title, content string, tags []string) {
+// parseAddArgs manually parses args to extract title, content, tags, and file path
+// Supports flexible flag ordering: title can come first, -c, -t, and --file can be in any order
+func parseAddArgs(args []string) (title, content, filePath string, tags []string) {
 	if len(args) == 0 {
-		return "", "", nil
+		return "", "", "", nil
 	}
 
 	// Find flag positions
 	cPos := -1
 	tPos := -1
+	filePos := -1
 	for i, arg := range args {
 		if arg == "-c" {
 			cPos = i
 		} else if arg == "-t" {
 			tPos = i
+		} else if arg == "--file" {
+			filePos = i
 		}
 	}
 
 	// Extract title (everything before first flag)
 	firstFlagPos := len(args)
-	if cPos != -1 && tPos != -1 {
-		if cPos < tPos {
-			firstFlagPos = cPos
-		} else {
-			firstFlagPos = tPos
-		}
-	} else if cPos != -1 {
-		firstFlagPos = cPos
-	} else if tPos != -1 {
-		firstFlagPos = tPos
+	flagPositions := []int{}
+	if cPos != -1 {
+		flagPositions = append(flagPositions, cPos)
 	}
+	if tPos != -1 {
+		flagPositions = append(flagPositions, tPos)
+	}
+	if filePos != -1 {
+		flagPositions = append(flagPositions, filePos)
+	}
+
+	if len(flagPositions) > 0 {
+		firstFlagPos = flagPositions[0]
+		for _, pos := range flagPositions {
+			if pos < firstFlagPos {
+				firstFlagPos = pos
+			}
+		}
+	}
+
 	if firstFlagPos > 0 {
 		title = strings.Join(args[:firstFlagPos], " ")
 	}
@@ -82,17 +97,110 @@ func parseAddArgs(args []string) (title, content string, tags []string) {
 		if cPos != -1 && cPos > tPos {
 			tagsEnd = cPos
 		}
+		// If --file comes after -t, tags end at --file
+		if filePos != -1 && filePos > tPos {
+			if cPos == -1 || filePos < cPos {
+				tagsEnd = filePos
+			}
+		}
 		if tagsStart < tagsEnd {
 			tags = args[tagsStart:tagsEnd]
 		}
 	}
 
-	return title, content, tags
+	// Extract file path (single arg after --file)
+	if filePos != -1 && filePos+1 < len(args) {
+		filePath = args[filePos+1]
+	}
+
+	return title, content, filePath, tags
 }
 
-func HandleAdd(args []string) error {
-	// Parse args (empty args returns empty title/content/tags)
-	title, content, tags := parseAddArgs(args)
+func handleAddFile(args []string, filePath string) error {
+	// Parse title and tags from args (ignore -c content flag for files)
+	title, _, _, tags := parseAddArgs(args)
+
+	// Validate file exists
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Read file content
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Base64 encode
+	encoded := base64.StdEncoding.EncodeToString(fileBytes)
+
+	// Get filename
+	filename := filepath.Base(filePath)
+
+	// Use filename without extension as title if not provided
+	if title == "" {
+		title = strings.TrimSuffix(filename, filepath.Ext(filename))
+	}
+
+	// Create file item
+	fileSize := fileInfo.Size()
+	item := &storage.Item{
+		Title:    title,
+		Tags:     tags,
+		Type:     storage.TypeFile,
+		Created:  time.Now(),
+		Modified: time.Now(),
+		Filename: filename,
+		Size:     &fileSize,
+		Content: storage.ItemContent{
+			Text: encoded,
+		},
+	}
+
+	// Generate unique ID
+	var id string
+	for i := 0; i < maxRetries; i++ {
+		id, err = generateID()
+		if err != nil {
+			return fmt.Errorf("failed to generate ID: %w", err)
+		}
+
+		exists, err := storage.ItemExists(id)
+		if err != nil {
+			return fmt.Errorf("failed to check item existence: %w", err)
+		}
+		if !exists {
+			break
+		}
+
+		if i == maxRetries-1 {
+			return fmt.Errorf("failed to generate unique ID after %d attempts", maxRetries)
+		}
+	}
+
+	// Get password with verification
+	password, err := crypto.GetPasswordWithVerification()
+	if err != nil {
+		return fmt.Errorf("failed to get password: %w", err)
+	}
+
+	if err := storage.CreateItem(id, item, password); err != nil {
+		return fmt.Errorf("failed to create item: %w", err)
+	}
+
+	fmt.Printf("+ %s (%s, %d bytes)\n", ui.FormatItem(id, item.Title, item.Tags, "it#"), filename, fileSize)
+	return nil
+}
+
+func HandleAdd(args []string, _ string) error {
+	// Parse args (empty args returns empty title/content/tags/filePath)
+	title, content, filePath, tags := parseAddArgs(args)
+
+	// If --file flag provided, handle file item
+	if filePath != "" {
+		return handleAddFile(args, filePath)
+	}
 
 	var item *storage.Item
 

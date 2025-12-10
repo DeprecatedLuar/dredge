@@ -49,13 +49,15 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:    "add",
-				Aliases: []string{"a", "new", "+"},
-				Usage:   "Add a new item",
+				Name:                   "add",
+				Aliases:                []string{"a", "new", "+"},
+				Usage:                  "Add a new item",
+				SkipFlagParsing:        true,
+				UseShortOptionHandling: false,
 				Action: func(c *cli.Context) error {
-					// No args: open empty editor
-					// With args: parse title/content/tags
-					return commands.HandleAdd(c.Args().Slice())
+					// Manual arg parsing handles all flags (-t, -c, --file)
+					// We pass all args and let HandleAdd parse them
+					return commands.HandleAdd(c.Args().Slice(), "")
 				},
 			},
 			{
@@ -131,6 +133,13 @@ func main() {
 				Usage: "Unlink an item from system path",
 				Action: func(c *cli.Context) error {
 					return commands.HandleUnlink(c.Args().Slice())
+				},
+			},
+			{
+				Name:  "export",
+				Usage: "Export a file item to filesystem",
+				Action: func(c *cli.Context) error {
+					return commands.HandleExport(c.Args().Slice())
 				},
 			},
 			{

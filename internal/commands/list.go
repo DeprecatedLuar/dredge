@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/storage"
@@ -54,7 +55,15 @@ func HandleList(args []string) error {
 
 	// Print all items
 	for _, entry := range entries {
-		fmt.Println(ui.FormatItem(entry.id, entry.item.Title, entry.item.Tags, "it#"))
+		line := ui.FormatItem(entry.id, entry.item.Title, entry.item.Tags, "it#")
+
+		// Use angle brackets for file items
+		if entry.item.Type == storage.TypeFile {
+			// Replace [id] with <id>
+			line = strings.Replace(line, "["+entry.id+"]", "<"+entry.id+">", 1)
+		}
+
+		fmt.Println(line)
 	}
 
 	// Cache IDs for numbered access
