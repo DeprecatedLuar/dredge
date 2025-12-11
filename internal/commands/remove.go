@@ -46,6 +46,14 @@ func HandleRemove(args []string) error {
 			return fmt.Errorf("failed to read item [%s]: %w", id, err)
 		}
 
+		// Unlink if item has active link (cleans up spawned file and symlink)
+		if storage.IsLinked(id) {
+			if err := storage.Unlink(id); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to unlink item [%s]: %v\n", id, err)
+				// Continue with removal anyway
+			}
+		}
+
 		// Move to trash
 		if err := storage.MoveToTrash(id); err != nil {
 			return fmt.Errorf("failed to move item [%s] to trash: %w", id, err)

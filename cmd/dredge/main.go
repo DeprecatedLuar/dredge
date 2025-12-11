@@ -10,6 +10,7 @@ import (
 
 	"github.com/DeprecatedLuar/dredge/internal/commands"
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
+	"github.com/DeprecatedLuar/dredge/internal/selfheal"
 	"github.com/DeprecatedLuar/dredge/internal/storage"
 )
 
@@ -86,9 +87,11 @@ func main() {
 				},
 			},
 			{
-				Name:    "edit",
-				Aliases: []string{"e"},
-				Usage:   "Edit an item",
+				Name:                   "edit",
+				Aliases:                []string{"e"},
+				Usage:                  "Edit an item",
+				SkipFlagParsing:        true,
+				UseShortOptionHandling: false,
 				Action: func(c *cli.Context) error {
 					return commands.HandleEdit(c.Args().Slice())
 				},
@@ -108,24 +111,21 @@ func main() {
 				},
 			},
 			{
-				Name:    "link",
-				Aliases: []string{"ln"},
-				Usage:   "Link an item to a system path",
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "force",
-						Usage: "Overwrite existing file at target path",
-					},
-					&cli.BoolFlag{
-						Name:    "p",
-						Usage:   "Create parent directories if they don't exist",
-						Aliases: []string{"parents"},
-					},
-				},
+				Name:    "mv",
+				Aliases: []string{"rename", "rn"},
+				Usage:   "Rename an item ID",
 				Action: func(c *cli.Context) error {
-					force := c.Bool("force")
-					createParent := c.Bool("p")
-					return commands.HandleLink(c.Args().Slice(), force, createParent)
+					return commands.HandleMove(c.Args().Slice())
+				},
+			},
+			{
+				Name:                   "link",
+				Aliases:                []string{"ln"},
+				Usage:                  "Link an item to a system path",
+				SkipFlagParsing:        true,
+				UseShortOptionHandling: false,
+				Action: func(c *cli.Context) error {
+					return commands.HandleLink(c.Args().Slice())
 				},
 			},
 			{
@@ -137,7 +137,7 @@ func main() {
 			},
 			{
 				Name:  "export",
-				Usage: "Export a file item to filesystem",
+				Usage: "Export a binary item to filesystem",
 				Action: func(c *cli.Context) error {
 					return commands.HandleExport(c.Args().Slice())
 				},
@@ -172,6 +172,9 @@ func main() {
 			},
 		},
 		Before: func(c *cli.Context) error {
+			// Check if this is a new session (no cached password)
+			isNewSession := !crypto.HasActiveSession()
+
 			// Cache password if provided via flag
 			if password := c.String("password"); password != "" {
 				Debugf("Caching password from --password flag")
@@ -179,8 +182,15 @@ func main() {
 					fmt.Fprintf(os.Stderr, "Warning: failed to cache password: %v\n", err)
 				} else {
 					Debugf("Password cached successfully")
+					isNewSession = true // Treat flag password as new session
 				}
 			}
+
+			// Run self-healing on new session
+			if isNewSession {
+				selfheal.Run()
+			}
+
 			return nil
 		},
 		Action: func(c *cli.Context) error {

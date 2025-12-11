@@ -250,11 +250,11 @@ func TestItemExists(t *testing.T) {
 	}
 }
 
-func TestNewFileItem(t *testing.T) {
-	item := NewFileItem("Service Key", "key.json", 2048, "base64data", []string{"api", "gcp"})
+func TestNewBinaryItem(t *testing.T) {
+	item := NewBinaryItem("Service Key", "key.json", 2048, "base64data", []string{"api", "gcp"})
 
-	if item.Type != TypeFile {
-		t.Errorf("Type = %q, want %q", item.Type, TypeFile)
+	if item.Type != TypeBinary {
+		t.Errorf("Type = %q, want %q", item.Type, TypeBinary)
 	}
 	if item.Filename != "key.json" {
 		t.Errorf("Filename = %q, want 'key.json'", item.Filename)

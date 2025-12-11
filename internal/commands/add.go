@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/editor"
@@ -19,6 +21,11 @@ const (
 	idLength   = 3
 	maxRetries = 10
 )
+
+// isTextContent checks if content is text (valid UTF-8, no null bytes)
+func isTextContent(data []byte) bool {
+	return utf8.Valid(data) && !bytes.Contains(data, []byte{0})
+}
 
 func generateID() (string, error) {
 	bytes := make([]byte, idLength)
@@ -132,30 +139,46 @@ func handleAddFile(args []string, filePath string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Base64 encode
-	encoded := base64.StdEncoding.EncodeToString(fileBytes)
-
-	// Get filename
+	// Get filename and size
 	filename := filepath.Base(filePath)
+	fileSize := fileInfo.Size()
 
 	// Use filename without extension as title if not provided
 	if title == "" {
 		title = strings.TrimSuffix(filename, filepath.Ext(filename))
 	}
 
-	// Create file item
-	fileSize := fileInfo.Size()
-	item := &storage.Item{
-		Title:    title,
-		Tags:     tags,
-		Type:     storage.TypeFile,
-		Created:  time.Now(),
-		Modified: time.Now(),
-		Filename: filename,
-		Size:     &fileSize,
-		Content: storage.ItemContent{
-			Text: encoded,
-		},
+	// Detect if content is text or binary
+	var item *storage.Item
+	if isTextContent(fileBytes) {
+		// Text file: store as TypeText with plain content
+		item = &storage.Item{
+			Title:    title,
+			Tags:     tags,
+			Type:     storage.TypeText,
+			Created:  time.Now(),
+			Modified: time.Now(),
+			Filename: filename,
+			Size:     &fileSize,
+			Content: storage.ItemContent{
+				Text: string(fileBytes),
+			},
+		}
+	} else {
+		// Binary file: store as TypeBinary with base64-encoded content
+		encoded := base64.StdEncoding.EncodeToString(fileBytes)
+		item = &storage.Item{
+			Title:    title,
+			Tags:     tags,
+			Type:     storage.TypeBinary,
+			Created:  time.Now(),
+			Modified: time.Now(),
+			Filename: filename,
+			Size:     &fileSize,
+			Content: storage.ItemContent{
+				Text: encoded,
+			},
+		}
 	}
 
 	// Generate unique ID
@@ -189,7 +212,12 @@ func handleAddFile(args []string, filePath string) error {
 		return fmt.Errorf("failed to create item: %w", err)
 	}
 
-	fmt.Printf("+ %s (%s, %d bytes)\n", ui.FormatItem(id, item.Title, item.Tags, "it#"), filename, fileSize)
+	// Show appropriate output based on type
+	if item.Type == storage.TypeText {
+		fmt.Printf("+ %s (text from %s, %d bytes)\n", ui.FormatItem(id, item.Title, item.Tags, "it#"), filename, fileSize)
+	} else {
+		fmt.Printf("+ %s (binary: %s, %d bytes)\n", ui.FormatItem(id, item.Title, item.Tags, "it#"), filename, fileSize)
+	}
 	return nil
 }
 
@@ -197,7 +225,7 @@ func HandleAdd(args []string, _ string) error {
 	// Parse args (empty args returns empty title/content/tags/filePath)
 	title, content, filePath, tags := parseAddArgs(args)
 
-	// If --file flag provided, handle file item
+	// If --file flag provided, handle binary item
 	if filePath != "" {
 		return handleAddFile(args, filePath)
 	}

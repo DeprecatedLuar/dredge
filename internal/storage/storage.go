@@ -44,8 +44,8 @@ const (
 type ItemType string
 
 const (
-	TypeText ItemType = "text"
-	TypeFile ItemType = "file"
+	TypeText   ItemType = "text"
+	TypeBinary ItemType = "binary"
 )
 
 // Item represents a stored item (secret, config, file, etc.)
@@ -82,13 +82,13 @@ func NewTextItem(title, content string, tags []string) *Item {
 	}
 }
 
-// NewFileItem creates a new file item with base64-encoded content
-func NewFileItem(title, filename string, size int64, encodedContent string, tags []string) *Item {
+// NewBinaryItem creates a new binary item with base64-encoded content
+func NewBinaryItem(title, filename string, size int64, encodedContent string, tags []string) *Item {
 	now := time.Now()
 	return &Item{
 		Title:    title,
 		Tags:     tags,
-		Type:     TypeFile,
+		Type:     TypeBinary,
 		Created:  now,
 		Modified: now,
 		Filename: filename,

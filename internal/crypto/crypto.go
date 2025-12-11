@@ -31,7 +31,6 @@ const (
 	Argon2KeyLength = 32        // 32 bytes for AES-256
 )
 
-
 // Password verification
 const (
 	PasswordVerifyFile  = ".dredge-key"

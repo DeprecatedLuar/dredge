@@ -78,32 +78,13 @@ func Init(dredgeDir, repoSlug string) error {
 		}
 	}
 
-	// Initial commit if there are items
+	// Initial commit and push if there are items
 	itemsDir := filepath.Join(dredgeDir, "items")
 	if entries, err := os.ReadDir(itemsDir); err == nil && len(entries) > 0 {
-		// Add items/ and .gitignore
-		if _, err := runGitCommand(dredgeDir, "add", "items/", ".gitignore"); err != nil {
-			return fmt.Errorf("failed to add files: %w", err)
+		// Use centralized commit+push logic
+		if err := commitAndPush(dredgeDir, true); err != nil {
+			return err
 		}
-
-		// Check if .dredge-key exists and add it
-		keyFile := filepath.Join(dredgeDir, ".dredge-key")
-		if _, err := os.Stat(keyFile); err == nil {
-			if _, err := runGitCommand(dredgeDir, "add", ".dredge-key"); err != nil {
-				return fmt.Errorf("failed to add .dredge-key: %w", err)
-			}
-		}
-
-		// Initial commit
-		if _, err := runGitCommand(dredgeDir, "commit", "-m", "Initial commit"); err != nil {
-			return fmt.Errorf("failed to create initial commit: %w", err)
-		}
-
-		// Push to remote
-		if output, err := runGitCommand(dredgeDir, "push", "-u", "origin", DefaultBranch); err != nil {
-			return fmt.Errorf("failed to push to remote: %s", strings.TrimSpace(output))
-		}
-
 		fmt.Println("Initialized and pushed to GitHub")
 	} else {
 		fmt.Println("Initialized (no items to push yet)")
@@ -118,58 +99,24 @@ func Push(dredgeDir string) error {
 		return fmt.Errorf("not a git repository - run 'dredge init <user/repo>' first")
 	}
 
-	// Get current branch name
-	branch, err := getCurrentBranch(dredgeDir)
-	if err != nil {
-		return fmt.Errorf("failed to get current branch: %w", err)
+	// Always stage tracked files first
+	if err := addTrackedFiles(dredgeDir); err != nil {
+		return err
 	}
 
-	// Check if there are any changes
-	status, err := runGitCommand(dredgeDir, "status", "--porcelain", "items/", ".dredge-key")
-	if err != nil {
-		return fmt.Errorf("failed to check git status: %w", err)
+	// Check if there are staged changes to commit
+	diffOutput, _ := runGitCommand(dredgeDir, "diff", "--cached", "--quiet")
+	hasStagedChanges := diffOutput != "" // Non-empty means changes exist
+
+	// If we have staged changes, commit them
+	if hasStagedChanges {
+		if err := commitChanges(dredgeDir); err != nil {
+			return err
+		}
 	}
 
-	if strings.TrimSpace(status) == "" {
-		fmt.Println("No changes to push")
-		return nil
-	}
-
-	// Add items/ and .dredge-key first
-	if _, err := runGitCommand(dredgeDir, "add", "items/", ".dredge-key"); err != nil {
-		return fmt.Errorf("failed to add files: %w", err)
-	}
-
-	// Get changed items with action types
-	changes, err := getChangedItemsWithActions(dredgeDir)
-	if err != nil {
-		return fmt.Errorf("failed to detect changed items: %w", err)
-	}
-
-	// Build commit message: "add [id] [id]\nupd [id]\ndel [id] [id]"
-	commitMsg := formatChangeMessage(changes)
-	if commitMsg == "" {
-		commitMsg = fmt.Sprintf("Update: %s", time.Now().Format("2006-01-02 15:04:05"))
-	}
-
-	// Commit
-	if _, err := runGitCommand(dredgeDir, "commit", "-m", commitMsg); err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
-	}
-
-	// Push with live output
-	pushCmd := exec.Command("git", "push", "origin", branch)
-	pushCmd.Dir = dredgeDir
-	pushCmd.Stdout = os.Stdout
-	pushCmd.Stderr = os.Stderr
-	if err := pushCmd.Run(); err != nil {
-		return fmt.Errorf("failed to push: %w", err)
-	}
-
-	// Print our summary at the end with newline separator
-	fmt.Println()
-	fmt.Println(commitMsg)
-	return nil
+	// Now push everything (new commits + any unpushed commits)
+	return pushToRemote(dredgeDir)
 }
 
 // Pull pulls latest changes from remote
@@ -207,6 +154,100 @@ func Sync(dredgeDir string) error {
 		return err
 	}
 	return Push(dredgeDir)
+}
+
+// commitAndPush is the core commit+push workflow used by Init
+func commitAndPush(dir string, isInitial bool) error {
+	// Add tracked files
+	if err := addTrackedFiles(dir); err != nil {
+		return err
+	}
+
+	// Create commit (initial or smart message)
+	if isInitial {
+		if _, err := runGitCommand(dir, "commit", "-m", "Initial commit"); err != nil {
+			return fmt.Errorf("failed to create initial commit: %w", err)
+		}
+	} else {
+		if err := commitChanges(dir); err != nil {
+			return err
+		}
+	}
+
+	// Push to remote
+	return pushToRemote(dir)
+}
+
+// addTrackedFiles adds items/ and .dredge-key to git staging
+func addTrackedFiles(dir string) error {
+	// Add .gitignore if this is initial setup
+	gitignorePath := filepath.Join(dir, ".gitignore")
+	if _, err := os.Stat(gitignorePath); err == nil {
+		if _, err := runGitCommand(dir, "add", ".gitignore"); err != nil {
+			return fmt.Errorf("failed to add .gitignore: %w", err)
+		}
+	}
+
+	// Always add items/
+	if _, err := runGitCommand(dir, "add", "items/"); err != nil {
+		return fmt.Errorf("failed to add items: %w", err)
+	}
+
+	// Add .dredge-key if it exists
+	keyFile := filepath.Join(dir, ".dredge-key")
+	if _, err := os.Stat(keyFile); err == nil {
+		if _, err := runGitCommand(dir, "add", ".dredge-key"); err != nil {
+			return fmt.Errorf("failed to add .dredge-key: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// commitChanges creates a commit with smart message based on changes
+func commitChanges(dir string) error {
+	// Get changed items with action types
+	changes, err := getChangedItemsWithActions(dir)
+	if err != nil {
+		return fmt.Errorf("failed to detect changed items: %w", err)
+	}
+
+	// Format as plain text (no colors in commit message)
+	commitMsg := formatCommitMessage(changes)
+	if commitMsg == "" {
+		commitMsg = fmt.Sprintf("Update: %s", time.Now().Format("2006-01-02 15:04:05"))
+	}
+
+	// Commit
+	if _, err := runGitCommand(dir, "commit", "-m", commitMsg); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	// Print colored summary
+	fmt.Println()
+	printColoredChanges(changes)
+
+	return nil
+}
+
+// pushToRemote pushes all commits to remote
+func pushToRemote(dir string) error {
+	// Get current branch
+	branch, err := getCurrentBranch(dir)
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	// Push with live output
+	pushCmd := exec.Command("git", "push", "-u", "origin", branch)
+	pushCmd.Dir = dir
+	pushCmd.Stdout = os.Stdout
+	pushCmd.Stderr = os.Stderr
+	if err := pushCmd.Run(); err != nil {
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	return nil
 }
 
 // isGitRepo checks if directory is a git repository
@@ -265,15 +306,8 @@ func getChangedItemsWithActions(dir string) (map[string][]string, error) {
 	return changes, nil
 }
 
-// formatChangeMessage formats changes as "add [id] [id]\nupd [id]\ndel [id]" with colors
-func formatChangeMessage(changes map[string][]string) string {
-	const (
-		colorGreen = "\033[32m"
-		colorBlue  = "\033[34m"
-		colorRed   = "\033[31m"
-		colorReset = "\033[0m"
-	)
-
+// formatCommitMessage formats changes as plain text for git commit (no colors)
+func formatCommitMessage(changes map[string][]string) string {
 	lines := []string{}
 
 	if len(changes["add"]) > 0 {
@@ -281,7 +315,7 @@ func formatChangeMessage(changes map[string][]string) string {
 		for i, id := range changes["add"] {
 			ids[i] = "[" + id + "]"
 		}
-		lines = append(lines, colorGreen+"add "+strings.Join(ids, " ")+colorReset)
+		lines = append(lines, "add "+strings.Join(ids, " "))
 	}
 
 	if len(changes["upd"]) > 0 {
@@ -289,7 +323,7 @@ func formatChangeMessage(changes map[string][]string) string {
 		for i, id := range changes["upd"] {
 			ids[i] = "[" + id + "]"
 		}
-		lines = append(lines, colorBlue+"upd "+strings.Join(ids, " ")+colorReset)
+		lines = append(lines, "upd "+strings.Join(ids, " "))
 	}
 
 	if len(changes["del"]) > 0 {
@@ -297,15 +331,49 @@ func formatChangeMessage(changes map[string][]string) string {
 		for i, id := range changes["del"] {
 			ids[i] = "[" + id + "]"
 		}
-		lines = append(lines, colorRed+"del "+strings.Join(ids, " ")+colorReset)
+		lines = append(lines, "del "+strings.Join(ids, " "))
 	}
 
 	return strings.Join(lines, "\n")
 }
 
-// addRemote adds a git remote
+// printColoredChanges prints changes with colors to terminal (not for git)
+func printColoredChanges(changes map[string][]string) {
+	const (
+		colorGreen = "\033[32m"
+		colorBlue  = "\033[34m"
+		colorRed   = "\033[31m"
+		colorReset = "\033[0m"
+	)
+
+	if len(changes["add"]) > 0 {
+		ids := make([]string, len(changes["add"]))
+		for i, id := range changes["add"] {
+			ids[i] = "[" + id + "]"
+		}
+		fmt.Println(colorGreen + "add " + strings.Join(ids, " ") + colorReset)
+	}
+
+	if len(changes["upd"]) > 0 {
+		ids := make([]string, len(changes["upd"]))
+		for i, id := range changes["upd"] {
+			ids[i] = "[" + id + "]"
+		}
+		fmt.Println(colorBlue + "upd " + strings.Join(ids, " ") + colorReset)
+	}
+
+	if len(changes["del"]) > 0 {
+		ids := make([]string, len(changes["del"]))
+		for i, id := range changes["del"] {
+			ids[i] = "[" + id + "]"
+		}
+		fmt.Println(colorRed + "del " + strings.Join(ids, " ") + colorReset)
+	}
+}
+
+// addRemote adds a git remote using HTTPS (works with gh CLI auth)
 func addRemote(dir, repoSlug string) error {
-	remoteURL := fmt.Sprintf("git@github.com:%s.git", repoSlug)
+	remoteURL := fmt.Sprintf("https://github.com/%s.git", repoSlug)
 	if _, err := runGitCommand(dir, "remote", "add", "origin", remoteURL); err != nil {
 		return fmt.Errorf("failed to add remote: %w", err)
 	}

@@ -207,6 +207,12 @@ func parseTitleAndTags(line string) (title string, tags []string) {
 }
 
 
+// OpenRawContent opens editor with raw text content, returns edited content
+// This is a low-level primitive for direct content editing (e.g., raw TOML)
+func OpenRawContent(initialContent string) (string, error) {
+	return openEditor(initialContent)
+}
+
 // openEditor creates temp file, opens editor, returns edited content
 func openEditor(initialContent string) (string, error) {
 	editor := os.Getenv("EDITOR")

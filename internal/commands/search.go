@@ -57,15 +57,15 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 	// 1. -l flag: always view top result
 	// 2. -s flag: always show list
 	// 3. Smart default: auto-view if clear winner, else list
-	// 4. Never auto-view file items (force list instead)
+	// 4. Never auto-view binary items (force list instead)
 	shouldAutoView := false
 
 	if luck {
 		// Force view top result
 		shouldAutoView = true
 	} else if !forceSearch {
-		// Never auto-view file items (they don't have readable content)
-		if results[0].Item.Type == storage.TypeFile {
+		// Never auto-view binary items (they don't have readable content)
+		if results[0].Item.Type == storage.TypeBinary {
 			shouldAutoView = false
 		} else if len(results) == 1 {
 			// Only one result, definitely view it
@@ -89,8 +89,8 @@ func HandleSearch(query string, luck bool, forceSearch bool) error {
 	for _, result := range results {
 		line := ui.FormatItem(result.ID, result.Item.Title, result.Item.Tags, "it#")
 
-		// Use angle brackets for file items
-		if result.Item.Type == storage.TypeFile {
+		// Use angle brackets for binary items
+		if result.Item.Type == storage.TypeBinary {
 			// Replace [id] with <id>
 			line = strings.Replace(line, "["+result.ID+"]", "<"+result.ID+">", 1)
 		}

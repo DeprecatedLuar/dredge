@@ -9,13 +9,29 @@ import (
 	"github.com/DeprecatedLuar/dredge/internal/storage"
 )
 
-func HandleLink(args []string, force bool, createParent bool) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: dredge link <id|number> <path> [--force] [-p]")
+func HandleLink(args []string) error {
+	// Parse flags from any position
+	var force, createParent bool
+	var positionalArgs []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--force", "-f":
+			force = true
+		case "-p", "--parents":
+			createParent = true
+		default:
+			positionalArgs = append(positionalArgs, arg)
+		}
+	}
+
+	if len(positionalArgs) < 2 {
+		return fmt.Errorf("usage: dredge link <id|number> <path> [--force|-f] [-p|--parents]")
 	}
 
 	// Resolve ID from first argument (supports numbered access)
-	ids, err := ResolveArgs([]string{args[0]})
+	ids, err := ResolveArgs([]string{positionalArgs[0]})
 	if err != nil {
 		return err
 	}
@@ -25,7 +41,7 @@ func HandleLink(args []string, force bool, createParent bool) error {
 	}
 
 	id := ids[0]
-	targetPath := args[1]
+	targetPath := positionalArgs[1]
 
 	// Validate target path
 	if !filepath.IsAbs(targetPath) {

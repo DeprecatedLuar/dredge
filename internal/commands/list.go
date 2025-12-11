@@ -57,8 +57,8 @@ func HandleList(args []string) error {
 	for _, entry := range entries {
 		line := ui.FormatItem(entry.id, entry.item.Title, entry.item.Tags, "it#")
 
-		// Use angle brackets for file items
-		if entry.item.Type == storage.TypeFile {
+		// Use angle brackets for binary items
+		if entry.item.Type == storage.TypeBinary {
 			// Replace [id] with <id>
 			line = strings.Replace(line, "["+entry.id+"]", "<"+entry.id+">", 1)
 		}

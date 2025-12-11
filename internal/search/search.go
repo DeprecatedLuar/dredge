@@ -77,7 +77,12 @@ func Search(items map[string]*storage.Item, query string) []Result {
 // Exponential weighting: longer words dominate (github²=36 >> key²=9)
 func scoreItem(item *storage.Item, terms []string) (int, bool) {
 	title := strings.ToLower(item.Title)
-	content := strings.ToLower(item.Content.Text)
+
+	// Only search content for text items (skip binary base64 data)
+	var content string
+	if item.Type == storage.TypeText {
+		content = strings.ToLower(item.Content.Text)
+	}
 
 	// Lowercase all tags once
 	tags := make([]string, len(item.Tags))

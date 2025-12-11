@@ -2,23 +2,48 @@ package commands
 
 import (
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
 	"github.com/DeprecatedLuar/dredge/internal/editor"
 	"github.com/DeprecatedLuar/dredge/internal/storage"
 )
 
 func HandleEdit(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: dredge edit <id>")
+	// Parse flags manually (flexible positioning)
+	var id string
+	var tomlMode, metadataMode bool
+
+	for _, arg := range args {
+		switch arg {
+		case "--toml":
+			tomlMode = true
+		case "--metadata", "-m":
+			metadataMode = true
+		default:
+			if id == "" && !isFlag(arg) {
+				id = arg
+			}
+		}
+	}
+
+	if id == "" {
+		return fmt.Errorf("usage: dredge edit <id> [--toml|--metadata|-m]")
+	}
+
+	// Can't use both flags
+	if tomlMode && metadataMode {
+		return fmt.Errorf("cannot use --toml and --metadata together")
 	}
 
 	// Resolve numbered arg to ID
-	ids, err := ResolveArgs(args)
+	ids, err := ResolveArgs([]string{id})
 	if err != nil {
 		return err
 	}
-	id := ids[0]
+	id = ids[0]
 
 	// Get password
 	password, err := crypto.GetPasswordWithVerification()
@@ -26,23 +51,176 @@ func HandleEdit(args []string) error {
 		return fmt.Errorf("password error: %w", err)
 	}
 
-	// Read existing item
+	if tomlMode {
+		// Full TOML editing (including content)
+		return editRawTOML(id, password)
+	}
+
+	if metadataMode {
+		// Metadata editing: everything except [content] section
+		return editMetadata(id, password)
+	}
+
+	// Template-based editing (default)
 	item, err := storage.ReadItem(id, password)
 	if err != nil {
 		return fmt.Errorf("failed to read item [%s]: %w", id, err)
 	}
 
-	// Open editor with existing item
 	updatedItem, err := editor.OpenForExisting(item)
 	if err != nil {
 		return fmt.Errorf("failed to edit item: %w", err)
 	}
 
-	// Save updated item
 	if err := storage.UpdateItem(id, updatedItem, password); err != nil {
 		return fmt.Errorf("failed to update item: %w", err)
 	}
 
 	fmt.Printf("✓ [%s] %s\n", id, updatedItem.Title)
 	return nil
+}
+
+// isFlag checks if a string is a flag
+func isFlag(s string) bool {
+	return len(s) > 0 && s[0] == '-'
+}
+
+// editRawTOML: edit full TOML including content
+func editRawTOML(id, password string) error {
+	// Get item file path
+	itemPath, err := storage.GetItemPath(id)
+	if err != nil {
+		return fmt.Errorf("failed to get item path: %w", err)
+	}
+
+	// Read encrypted file
+	encryptedData, err := os.ReadFile(itemPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("item '%s' not found", id)
+		}
+		return fmt.Errorf("failed to read item: %w", err)
+	}
+
+	// Decrypt to get raw TOML
+	tomlData, err := crypto.Decrypt(encryptedData, password)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt: %w", err)
+	}
+
+	// Open editor with raw TOML
+	editedTOML, err := editor.OpenRawContent(string(tomlData))
+	if err != nil {
+		return fmt.Errorf("editor error: %w", err)
+	}
+
+	// Validate TOML syntax
+	var item storage.Item
+	if err := toml.Unmarshal([]byte(editedTOML), &item); err != nil {
+		return fmt.Errorf("invalid TOML: %w", err)
+	}
+
+	// Encrypt edited TOML
+	encryptedEdited, err := crypto.Encrypt([]byte(editedTOML), password)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt: %w", err)
+	}
+
+	// Write back to file
+	if err := os.WriteFile(itemPath, encryptedEdited, 0600); err != nil {
+		return fmt.Errorf("failed to write item: %w", err)
+	}
+
+	fmt.Printf("✓ [%s] %s (raw TOML)\n", id, item.Title)
+	return nil
+}
+
+// editMetadata: edit everything except [content] section
+func editMetadata(id, password string) error {
+	// Read full item first
+	item, err := storage.ReadItem(id, password)
+	if err != nil {
+		return fmt.Errorf("failed to read item [%s]: %w", id, err)
+	}
+
+	// Create metadata TOML (ALL fields except content and created)
+	// Note: created is immutable, only modified can be changed
+	metadataTOML := fmt.Sprintf(`title = %q
+tags = %v
+type = %q
+modified = %s`,
+		item.Title,
+		formatTags(item.Tags),
+		item.Type,
+		item.Modified.Format("2006-01-02T15:04:05.999999999Z07:00"))
+
+	// Add filename and size for file items
+	if item.Type == storage.TypeBinary {
+		if item.Filename != "" {
+			metadataTOML += fmt.Sprintf("\nfilename = %q", item.Filename)
+		}
+		if item.Size != nil {
+			metadataTOML += fmt.Sprintf("\nsize = %d", *item.Size)
+		}
+	}
+
+	// Open editor with metadata
+	editedMetadata, err := editor.OpenRawContent(metadataTOML)
+	if err != nil {
+		return fmt.Errorf("editor error: %w", err)
+	}
+
+	// Parse edited metadata
+	var metadata struct {
+		Title    string              `toml:"title"`
+		Tags     []string            `toml:"tags"`
+		Type     storage.ItemType    `toml:"type"`
+		Modified time.Time           `toml:"modified"`
+		Filename string              `toml:"filename"`
+		Size     *int64              `toml:"size"`
+	}
+	if err := toml.Unmarshal([]byte(editedMetadata), &metadata); err != nil {
+		return fmt.Errorf("invalid metadata TOML: %w", err)
+	}
+
+	// Validate required fields
+	if metadata.Title == "" {
+		return fmt.Errorf("title cannot be empty")
+	}
+	if metadata.Type != storage.TypeText && metadata.Type != storage.TypeBinary {
+		return fmt.Errorf("type must be 'text' or 'binary'")
+	}
+
+	// Update item with new metadata (preserve content and created timestamp)
+	item.Title = metadata.Title
+	item.Tags = metadata.Tags
+	item.Type = metadata.Type
+	item.Modified = metadata.Modified
+	item.Filename = metadata.Filename
+	item.Size = metadata.Size
+	// item.Created stays unchanged (immutable)
+
+	// Save updated item
+	if err := storage.UpdateItem(id, item, password); err != nil {
+		return fmt.Errorf("failed to update item: %w", err)
+	}
+
+	fmt.Printf("✓ [%s] %s (metadata)\n", id, item.Title)
+	return nil
+}
+
+// formatTags formats tags array for TOML
+func formatTags(tags []string) string {
+	if len(tags) == 0 {
+		return "[]"
+	}
+	result := "["
+	for i, tag := range tags {
+		if i > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf("%q", tag)
+	}
+	result += "]"
+	return result
 }

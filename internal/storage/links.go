@@ -84,6 +84,17 @@ func SaveManifest(manifest LinkManifest) error {
 	return nil
 }
 
+// RemoveFromManifest removes an entry from the manifest and saves
+func RemoveFromManifest(id string) error {
+	manifest, err := LoadManifest()
+	if err != nil {
+		return err
+	}
+
+	delete(manifest, id)
+	return SaveManifest(manifest)
+}
+
 // GetSpawnedPath returns the path to the spawned file for an item
 func GetSpawnedPath(id string) (string, error) {
 	dredgeDir, err := GetDredgeDir()
@@ -303,7 +314,7 @@ func Link(id, targetPath string, force bool) error {
 
 	// Only text items can be linked
 	if item.Type != TypeText {
-		return fmt.Errorf("cannot link file items (use text items only)")
+		return fmt.Errorf("cannot link binary items (use text items only)")
 	}
 
 	// Validate target path is absolute
@@ -373,22 +384,12 @@ func Link(id, targetPath string, force bool) error {
 }
 
 // Unlink removes the symlink, spawned file, and manifest entry
+// Handles broken links gracefully (item deleted, symlink missing, etc.)
+// Only errors if nothing exists to clean up
 func Unlink(id string) error {
 	// Check if linked
 	if !IsLinked(id) {
 		return fmt.Errorf("item %s is not linked", id)
-	}
-
-	// Get password and sync before unlinking (preserves manual edits)
-	password, err := crypto.GetPasswordWithVerification()
-	if err != nil {
-		return err
-	}
-
-	// ReadItem will automatically sync if spawned file changed
-	if _, err := ReadItem(id, password); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to sync before unlink: %v\n", err)
-		// Continue with unlink anyway
 	}
 
 	// Get target path from manifest
@@ -397,22 +398,52 @@ func Unlink(id string) error {
 		return fmt.Errorf("manifest entry not found for %s", id)
 	}
 
-	// Remove symlink (warn if missing but continue)
-	if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
+	// Track if we cleaned anything
+	cleanedAnything := false
+
+	// Check if encrypted item exists
+	itemExists, err := ItemExists(id)
+	if err == nil && itemExists {
+		// Item exists - sync spawned changes before unlinking
+		password, err := crypto.GetPasswordWithVerification()
+		if err != nil {
+			return err
+		}
+
+		// ReadItem will automatically sync if spawned file changed
+		if _, err := ReadItem(id, password); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to sync before unlink: %v\n", err)
+			// Continue with unlink anyway
+		}
+	}
+	// If item doesn't exist, skip password/sync (nothing to sync to)
+
+	// Remove symlink (silent if missing)
+	if err := os.Remove(targetPath); err == nil {
+		cleanedAnything = true
+	} else if !os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "Warning: failed to remove symlink at %s: %v\n", targetPath, err)
 	}
 
-	// Remove spawned file
-	if err := RemoveSpawnedFile(id); err != nil {
-		return err
+	// Remove spawned file (silent if missing)
+	spawnedPath, err := GetSpawnedPath(id)
+	if err == nil {
+		if err := os.Remove(spawnedPath); err == nil {
+			cleanedAnything = true
+		} else if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to remove spawned file: %v\n", err)
+		}
 	}
 
 	// Remove from manifest
-	manifest, err := LoadManifest()
-	if err != nil {
-		return err
+	if err := RemoveFromManifest(id); err != nil {
+		return fmt.Errorf("failed to update manifest: %w", err)
 	}
 
-	delete(manifest, id)
-	return SaveManifest(manifest)
+	// Error only if we cleaned nothing (everything was already gone)
+	if !cleanedAnything {
+		return fmt.Errorf("nothing to clean up for item %s (symlink and spawned file already removed)", id)
+	}
+
+	return nil
 }

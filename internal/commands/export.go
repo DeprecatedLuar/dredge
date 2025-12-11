@@ -38,11 +38,6 @@ func HandleExport(args []string) error {
 		return fmt.Errorf("failed to read item: %w", err)
 	}
 
-	// Validate item type
-	if item.Type != storage.TypeFile {
-		return fmt.Errorf("item %s is not a file item (type: %s)", id, item.Type)
-	}
-
 	// Determine output path
 	var outputPath string
 	if len(args) >= 2 {
@@ -77,22 +72,30 @@ func HandleExport(args []string) error {
 		return fmt.Errorf("file already exists at %s", outputPath)
 	}
 
-	// Decode base64 content
-	decodedContent, err := base64.StdEncoding.DecodeString(item.Content.Text)
-	if err != nil {
-		return fmt.Errorf("failed to decode file content: %w", err)
+	// Handle content based on item type
+	var contentToWrite []byte
+	if item.Type == storage.TypeBinary {
+		// Binary item: decode base64
+		decodedContent, err := base64.StdEncoding.DecodeString(item.Content.Text)
+		if err != nil {
+			return fmt.Errorf("failed to decode binary content: %w", err)
+		}
+		contentToWrite = decodedContent
+	} else {
+		// Text item: write content directly
+		contentToWrite = []byte(item.Content.Text)
 	}
 
 	// Verify size matches (if size metadata exists)
-	if item.Size != nil && int64(len(decodedContent)) != *item.Size {
-		return fmt.Errorf("size mismatch: expected %d bytes, got %d bytes", *item.Size, len(decodedContent))
+	if item.Size != nil && int64(len(contentToWrite)) != *item.Size {
+		return fmt.Errorf("size mismatch: expected %d bytes, got %d bytes", *item.Size, len(contentToWrite))
 	}
 
 	// Write to output path
-	if err := os.WriteFile(outputPath, decodedContent, 0644); err != nil {
+	if err := os.WriteFile(outputPath, contentToWrite, 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
-	fmt.Printf("Exported [%s] %s -> %s (%d bytes)\n", id, item.Title, outputPath, len(decodedContent))
+	fmt.Printf("Exported [%s] %s -> %s (%d bytes)\n", id, item.Title, outputPath, len(contentToWrite))
 	return nil
 }
