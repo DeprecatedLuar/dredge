@@ -170,6 +170,20 @@ func main() {
 					return commands.HandleSync(c.Args().Slice())
 				},
 			},
+			{
+				Name:  "status",
+				Usage: "Show pending changes",
+				Action: func(c *cli.Context) error {
+					return commands.HandleStatus(c.Args().Slice())
+				},
+			},
+			{
+				Name:  "passwd",
+				Usage: "Change vault password",
+				Action: func(c *cli.Context) error {
+					return commands.HandlePasswd()
+				},
+			},
 		},
 		Before: func(c *cli.Context) error {
 			// Check if this is a new session (no cached password)

@@ -30,7 +30,12 @@ const (
 
 // PromptPassword prompts the user for a password with hidden input.
 func PromptPassword() (string, error) {
-	fmt.Fprint(os.Stderr, "Password: ")
+	return PromptPasswordCustom("Password: ")
+}
+
+// PromptPasswordCustom prompts with a custom message for password with hidden input.
+func PromptPasswordCustom(prompt string) (string, error) {
+	fmt.Fprint(os.Stderr, prompt)
 
 	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
@@ -44,14 +49,19 @@ func PromptPassword() (string, error) {
 
 // PromptPasswordWithConfirmation prompts twice for password confirmation.
 func PromptPasswordWithConfirmation() (string, error) {
-	fmt.Fprint(os.Stderr, "Enter password: ")
+	return PromptPasswordWithConfirmationCustom("Enter password: ", "Confirm password: ")
+}
+
+// PromptPasswordWithConfirmationCustom prompts twice with custom messages.
+func PromptPasswordWithConfirmationCustom(prompt1, prompt2 string) (string, error) {
+	fmt.Fprint(os.Stderr, prompt1)
 	password1, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", fmt.Errorf("failed to read password: %w", err)
 	}
 
-	fmt.Fprint(os.Stderr, "Confirm password: ")
+	fmt.Fprint(os.Stderr, prompt2)
 	password2, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
 	if err != nil {

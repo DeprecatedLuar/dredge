@@ -105,8 +105,8 @@ func Push(dredgeDir string) error {
 	}
 
 	// Check if there are staged changes to commit
-	diffOutput, _ := runGitCommand(dredgeDir, "diff", "--cached", "--quiet")
-	hasStagedChanges := diffOutput != "" // Non-empty means changes exist
+	_, err := runGitCommand(dredgeDir, "diff", "--cached", "--quiet")
+	hasStagedChanges := err != nil // Error means changes exist (--quiet returns exit code 1)
 
 	// If we have staged changes, commit them
 	if hasStagedChanges {
@@ -154,6 +154,35 @@ func Sync(dredgeDir string) error {
 		return err
 	}
 	return Push(dredgeDir)
+}
+
+// Status shows what changes will be pushed
+func Status(dredgeDir string) error {
+	if !isGitRepo(dredgeDir) {
+		return fmt.Errorf("not a git repository - run 'dredge init <user/repo>' first")
+	}
+
+	// Stage tracked files to see what would be committed
+	if err := addTrackedFiles(dredgeDir); err != nil {
+		return err
+	}
+
+	// Get changed items with actions
+	changes, err := getChangedItemsWithActions(dredgeDir)
+	if err != nil {
+		return fmt.Errorf("failed to detect changes: %w", err)
+	}
+
+	// Check if there are any changes
+	totalChanges := len(changes["add"]) + len(changes["upd"]) + len(changes["del"])
+	if totalChanges == 0 {
+		fmt.Println("No changes to push")
+		return nil
+	}
+
+	// Print colored changes
+	printColoredChanges(changes)
+	return nil
 }
 
 // commitAndPush is the core commit+push workflow used by Init
@@ -308,14 +337,14 @@ func getChangedItemsWithActions(dir string) (map[string][]string, error) {
 
 // formatCommitMessage formats changes as plain text for git commit (no colors)
 func formatCommitMessage(changes map[string][]string) string {
-	lines := []string{}
+	parts := []string{}
 
 	if len(changes["add"]) > 0 {
 		ids := make([]string, len(changes["add"]))
 		for i, id := range changes["add"] {
 			ids[i] = "[" + id + "]"
 		}
-		lines = append(lines, "add "+strings.Join(ids, " "))
+		parts = append(parts, "add "+strings.Join(ids, " "))
 	}
 
 	if len(changes["upd"]) > 0 {
@@ -323,7 +352,7 @@ func formatCommitMessage(changes map[string][]string) string {
 		for i, id := range changes["upd"] {
 			ids[i] = "[" + id + "]"
 		}
-		lines = append(lines, "upd "+strings.Join(ids, " "))
+		parts = append(parts, "upd "+strings.Join(ids, " "))
 	}
 
 	if len(changes["del"]) > 0 {
@@ -331,10 +360,10 @@ func formatCommitMessage(changes map[string][]string) string {
 		for i, id := range changes["del"] {
 			ids[i] = "[" + id + "]"
 		}
-		lines = append(lines, "del "+strings.Join(ids, " "))
+		parts = append(parts, "del "+strings.Join(ids, " "))
 	}
 
-	return strings.Join(lines, "\n")
+	return strings.Join(parts, " ")
 }
 
 // printColoredChanges prints changes with colors to terminal (not for git)

@@ -230,11 +230,16 @@ func HandleAdd(args []string, _ string) error {
 		return handleAddFile(args, filePath)
 	}
 
+	// Get password with verification BEFORE opening editor (checks/creates .dredge-key)
+	password, err := crypto.GetPasswordWithVerification()
+	if err != nil {
+		return fmt.Errorf("failed to get password: %w", err)
+	}
+
 	var item *storage.Item
 
 	// If no content provided, open editor (includes empty args case)
 	if content == "" {
-		var err error
 		item, err = editor.OpenForNewItem(title, tags)
 		if err != nil {
 			return fmt.Errorf("failed to create item via editor: %w", err)
@@ -249,7 +254,6 @@ func HandleAdd(args []string, _ string) error {
 
 	// Generate unique ID
 	var id string
-	var err error
 	for i := 0; i < maxRetries; i++ {
 		id, err = generateID()
 		if err != nil {
@@ -267,12 +271,6 @@ func HandleAdd(args []string, _ string) error {
 		if i == maxRetries-1 {
 			return fmt.Errorf("failed to generate unique ID after %d attempts", maxRetries)
 		}
-	}
-
-	// Get password with verification (checks/creates .dredge-key)
-	password, err := crypto.GetPasswordWithVerification()
-	if err != nil {
-		return fmt.Errorf("failed to get password: %w", err)
 	}
 
 	if err := storage.CreateItem(id, item, password); err != nil {
