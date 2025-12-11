@@ -143,25 +143,20 @@ func editMetadata(id, password string) error {
 		return fmt.Errorf("failed to read item [%s]: %w", id, err)
 	}
 
-	// Create metadata TOML (ALL fields except content and created)
-	// Note: created is immutable, only modified can be changed
+	// Create metadata TOML (editable fields only - timestamps are auto-managed)
 	metadataTOML := fmt.Sprintf(`title = %q
 tags = %v
-type = %q
-modified = %s`,
+type = %q`,
 		item.Title,
 		formatTags(item.Tags),
-		item.Type,
-		item.Modified.Format("2006-01-02T15:04:05.999999999Z07:00"))
+		item.Type)
 
-	// Add filename and size for file items
-	if item.Type == storage.TypeBinary {
-		if item.Filename != "" {
-			metadataTOML += fmt.Sprintf("\nfilename = %q", item.Filename)
-		}
-		if item.Size != nil {
-			metadataTOML += fmt.Sprintf("\nsize = %d", *item.Size)
-		}
+	// Add filename and size if present (from --file imports)
+	if item.Filename != "" {
+		metadataTOML += fmt.Sprintf("\nfilename = %q", item.Filename)
+	}
+	if item.Size != nil {
+		metadataTOML += fmt.Sprintf("\nsize = %d", *item.Size)
 	}
 
 	// Open editor with metadata
@@ -172,12 +167,11 @@ modified = %s`,
 
 	// Parse edited metadata
 	var metadata struct {
-		Title    string              `toml:"title"`
-		Tags     []string            `toml:"tags"`
-		Type     storage.ItemType    `toml:"type"`
-		Modified time.Time           `toml:"modified"`
-		Filename string              `toml:"filename"`
-		Size     *int64              `toml:"size"`
+		Title    string           `toml:"title"`
+		Tags     []string         `toml:"tags"`
+		Type     storage.ItemType `toml:"type"`
+		Filename string           `toml:"filename"`
+		Size     *int64           `toml:"size"`
 	}
 	if err := toml.Unmarshal([]byte(editedMetadata), &metadata); err != nil {
 		return fmt.Errorf("invalid metadata TOML: %w", err)
@@ -191,14 +185,13 @@ modified = %s`,
 		return fmt.Errorf("type must be 'text' or 'binary'")
 	}
 
-	// Update item with new metadata (preserve content and created timestamp)
+	// Update item with new metadata (timestamps auto-managed)
 	item.Title = metadata.Title
 	item.Tags = metadata.Tags
 	item.Type = metadata.Type
-	item.Modified = metadata.Modified
+	item.Modified = time.Now()
 	item.Filename = metadata.Filename
 	item.Size = metadata.Size
-	// item.Created stays unchanged (immutable)
 
 	// Save updated item
 	if err := storage.UpdateItem(id, item, password); err != nil {

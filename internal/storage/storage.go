@@ -296,7 +296,7 @@ func UpdateItem(id string, item *Item, password string) error {
 
 	// If linked, update spawned file and manifest hash
 	if IsLinked(id) {
-		if err := UpdateSpawnedFile(id, item.Content.Text); err != nil {
+		if err := CreateSpawnedFile(id, item.Content.Text); err != nil {
 			return fmt.Errorf("failed to update spawned file: %w", err)
 		}
 		if err := UpdateManifestHash(id); err != nil {

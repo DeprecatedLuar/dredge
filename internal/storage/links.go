@@ -1,13 +1,11 @@
 package storage
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/DeprecatedLuar/dredge/internal/crypto"
@@ -84,17 +82,6 @@ func SaveManifest(manifest LinkManifest) error {
 	return nil
 }
 
-// RemoveFromManifest removes an entry from the manifest and saves
-func RemoveFromManifest(id string) error {
-	manifest, err := LoadManifest()
-	if err != nil {
-		return err
-	}
-
-	delete(manifest, id)
-	return SaveManifest(manifest)
-}
-
 // GetSpawnedPath returns the path to the spawned file for an item
 func GetSpawnedPath(id string) (string, error) {
 	dredgeDir, err := GetDredgeDir()
@@ -139,18 +126,26 @@ func RemoveSpawnedFile(id string) error {
 	return nil
 }
 
-// hashFile computes SHA256 hash of a file's content
+// hashFile computes SHA256 hash of a file
 func hashFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
-
 	hash := sha256.Sum256(data)
 	return fmt.Sprintf("sha256:%x", hash), nil
 }
 
-// syncItemIfNeeded checks if spawned file changed and syncs to encrypted item if needed
+// hashSpawnedFile computes SHA256 hash of a spawned file
+func hashSpawnedFile(id string) (string, error) {
+	spawnedPath, err := GetSpawnedPath(id)
+	if err != nil {
+		return "", err
+	}
+	return hashFile(spawnedPath)
+}
+
+// syncItemIfNeeded checks if spawned file changed and syncs to encrypted item
 func syncItemIfNeeded(id, password string) error {
 	manifest, err := LoadManifest()
 	if err != nil {
@@ -159,86 +154,36 @@ func syncItemIfNeeded(id, password string) error {
 
 	entry, exists := manifest[id]
 	if !exists {
-		return nil // Not linked, nothing to sync
+		return nil
 	}
 
-	spawnedPath, err := GetSpawnedPath(id)
-	if err != nil {
-		return err
-	}
-
-	// Compute current hash of spawned file
-	currentHash, err := hashFile(spawnedPath)
-	if err != nil {
-		return fmt.Errorf("failed to hash spawned file: %w", err)
-	}
-
-	// If hash matches, no changes detected
+	currentHash, _ := hashSpawnedFile(id)
 	if currentHash == entry.Hash {
 		return nil
 	}
 
-	// Hash mismatch → spawned file was manually edited
-	// Read spawned content
+	// Hash mismatch → sync spawned content back to encrypted item
+	spawnedPath, _ := GetSpawnedPath(id)
 	spawnedContent, err := os.ReadFile(spawnedPath)
 	if err != nil {
-		return fmt.Errorf("failed to read spawned file: %w", err)
+		return err
 	}
 
-	// Load encrypted item (inline to avoid recursion with ReadItem)
-	itemPath, err := GetItemPath(id)
-	if err != nil {
-		return fmt.Errorf("failed to get item path: %w", err)
-	}
-
-	encryptedData, err := os.ReadFile(itemPath)
-	if err != nil {
-		return fmt.Errorf("failed to read encrypted item: %w", err)
-	}
-
+	// Raw read to avoid recursion (ReadItem calls syncItemIfNeeded)
+	itemPath, _ := GetItemPath(id)
+	encryptedData, _ := os.ReadFile(itemPath)
 	decryptedData, err := crypto.Decrypt(encryptedData, password)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt item: %w", err)
+		return err
 	}
 
 	var item Item
 	if err := toml.Unmarshal(decryptedData, &item); err != nil {
-		return fmt.Errorf("failed to decode TOML: %w", err)
+		return err
 	}
 
-	// Update item with spawned content (spawned wins)
 	item.Content.Text = string(spawnedContent)
-	item.Modified = time.Now()
-
-	// Re-encrypt and save (inline to avoid triggering UpdateItem's linked logic)
-	var buf bytes.Buffer
-	encoder := toml.NewEncoder(&buf)
-	if err := encoder.Encode(&item); err != nil {
-		return fmt.Errorf("failed to encode item: %w", err)
-	}
-
-	encryptedData, err = crypto.Encrypt(buf.Bytes(), password)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt item: %w", err)
-	}
-
-	if err := os.WriteFile(itemPath, encryptedData, itemFilePermissions); err != nil {
-		return fmt.Errorf("failed to write encrypted item: %w", err)
-	}
-
-	// Update manifest hash
-	entry.Hash = currentHash
-	manifest[id] = entry
-	if err := SaveManifest(manifest); err != nil {
-		return fmt.Errorf("failed to update manifest: %w", err)
-	}
-
-	return nil
-}
-
-// UpdateSpawnedFile updates the spawned file content (called after edit)
-func UpdateSpawnedFile(id, content string) error {
-	return CreateSpawnedFile(id, content)
+	return UpdateItem(id, &item, password)
 }
 
 // UpdateManifestHash recomputes and updates the hash for a linked item
@@ -250,58 +195,40 @@ func UpdateManifestHash(id string) error {
 
 	entry, exists := manifest[id]
 	if !exists {
-		return nil // Not linked, nothing to update
+		return nil
 	}
 
-	spawnedPath, err := GetSpawnedPath(id)
-	if err != nil {
-		return err
-	}
-	newHash, err := hashFile(spawnedPath)
-	if err != nil {
-		return fmt.Errorf("failed to hash spawned file: %w", err)
-	}
-
-	entry.Hash = newHash
+	entry.Hash, _ = hashSpawnedFile(id)
 	manifest[id] = entry
 	return SaveManifest(manifest)
 }
 
 // IsLinked checks if an item has an active link
 func IsLinked(id string) bool {
-	manifest, err := LoadManifest()
-	if err != nil {
-		return false
-	}
-
-	_, exists := manifest[id]
+	_, exists := GetLinkedPath(id)
 	return exists
 }
 
-// GetLinkedPath returns the target path from manifest (empty string if not linked)
+// GetLinkedPath returns the target path from manifest
 func GetLinkedPath(id string) (string, bool) {
-	manifest, err := LoadManifest()
-	if err != nil {
-		return "", false
+	manifest, _ := LoadManifest()
+	if entry, exists := manifest[id]; exists {
+		return entry.Path, true
 	}
-
-	entry, exists := manifest[id]
-	if !exists {
-		return "", false
-	}
-
-	return entry.Path, true
+	return "", false
 }
 
 // Link creates a symlink from targetPath to .spawned/<id>
 func Link(id, targetPath string, force bool) error {
-	// Check if already linked
-	if IsLinked(id) {
-		existingPath, _ := GetLinkedPath(id)
-		return fmt.Errorf("item %s already linked to %s", id, existingPath)
+	manifest, err := LoadManifest()
+	if err != nil {
+		return err
 	}
 
-	// Load and validate item
+	if entry, exists := manifest[id]; exists {
+		return fmt.Errorf("item %s already linked to %s", id, entry.Path)
+	}
+
 	password, err := crypto.GetPasswordWithVerification()
 	if err != nil {
 		return err
@@ -312,71 +239,34 @@ func Link(id, targetPath string, force bool) error {
 		return fmt.Errorf("failed to load item: %w", err)
 	}
 
-	// Only text items can be linked
 	if item.Type != TypeText {
-		return fmt.Errorf("cannot link binary items (use text items only)")
+		return fmt.Errorf("cannot link binary items")
 	}
 
-	// Validate target path is absolute
-	if !filepath.IsAbs(targetPath) {
-		return fmt.Errorf("target path must be absolute")
-	}
-
-	// Check if target file exists
+	// Handle existing file at target
 	if _, err := os.Lstat(targetPath); err == nil {
 		if !force {
-			return fmt.Errorf("file already exists at %s (use --force to overwrite)", targetPath)
+			return fmt.Errorf("file exists at %s (use --force)", targetPath)
 		}
-		// Remove existing file if --force
-		if err := os.Remove(targetPath); err != nil {
-			return fmt.Errorf("failed to remove existing file: %w", err)
-		}
+		os.Remove(targetPath)
 	}
 
-	// Check parent directory exists
-	parentDir := filepath.Dir(targetPath)
-	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
-		return fmt.Errorf("parent directory does not exist: %s", parentDir)
-	}
-
-	// Create spawned file with decrypted content
+	// Create spawned file and symlink
 	if err := CreateSpawnedFile(id, item.Content.Text); err != nil {
 		return err
 	}
 
-	// Compute hash of spawned file
-	spawnedPath, err := GetSpawnedPath(id)
-	if err != nil {
-		return err
-	}
-	hash, err := hashFile(spawnedPath)
-	if err != nil {
-		RemoveSpawnedFile(id) // Cleanup on failure
-		return fmt.Errorf("failed to hash spawned file: %w", err)
-	}
-
-	// Create symlink
+	spawnedPath, _ := GetSpawnedPath(id)
 	if err := os.Symlink(spawnedPath, targetPath); err != nil {
-		RemoveSpawnedFile(id) // Cleanup on failure
+		RemoveSpawnedFile(id)
 		return fmt.Errorf("failed to create symlink: %w", err)
 	}
 
-	// Add to manifest
-	manifest, err := LoadManifest()
-	if err != nil {
-		os.Remove(targetPath)    // Cleanup symlink
-		RemoveSpawnedFile(id)    // Cleanup spawned file
-		return err
-	}
-
-	manifest[id] = LinkEntry{
-		Path: targetPath,
-		Hash: hash,
-	}
-
+	hash, _ := hashSpawnedFile(id)
+	manifest[id] = LinkEntry{Path: targetPath, Hash: hash}
 	if err := SaveManifest(manifest); err != nil {
-		os.Remove(targetPath)    // Cleanup symlink
-		RemoveSpawnedFile(id)    // Cleanup spawned file
+		os.Remove(targetPath)
+		RemoveSpawnedFile(id)
 		return err
 	}
 
@@ -384,66 +274,79 @@ func Link(id, targetPath string, force bool) error {
 }
 
 // Unlink removes the symlink, spawned file, and manifest entry
-// Handles broken links gracefully (item deleted, symlink missing, etc.)
-// Only errors if nothing exists to clean up
 func Unlink(id string) error {
-	// Check if linked
-	if !IsLinked(id) {
+	manifest, err := LoadManifest()
+	if err != nil {
+		return err
+	}
+
+	entry, exists := manifest[id]
+	if !exists {
 		return fmt.Errorf("item %s is not linked", id)
 	}
 
-	// Get target path from manifest
-	targetPath, exists := GetLinkedPath(id)
-	if !exists {
-		return fmt.Errorf("manifest entry not found for %s", id)
-	}
-
-	// Track if we cleaned anything
-	cleanedAnything := false
-
-	// Check if encrypted item exists
-	itemExists, err := ItemExists(id)
-	if err == nil && itemExists {
-		// Item exists - sync spawned changes before unlinking
-		password, err := crypto.GetPasswordWithVerification()
-		if err != nil {
-			return err
-		}
-
-		// ReadItem will automatically sync if spawned file changed
-		if _, err := ReadItem(id, password); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to sync before unlink: %v\n", err)
-			// Continue with unlink anyway
+	// Sync spawned changes before unlinking (if item still exists)
+	if itemExists, _ := ItemExists(id); itemExists {
+		if password, err := crypto.GetPasswordWithVerification(); err == nil {
+			ReadItem(id, password) // Triggers sync, ignore errors
 		}
 	}
-	// If item doesn't exist, skip password/sync (nothing to sync to)
 
-	// Remove symlink (silent if missing)
-	if err := os.Remove(targetPath); err == nil {
-		cleanedAnything = true
-	} else if !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Warning: failed to remove symlink at %s: %v\n", targetPath, err)
-	}
-
-	// Remove spawned file (silent if missing)
-	spawnedPath, err := GetSpawnedPath(id)
-	if err == nil {
-		if err := os.Remove(spawnedPath); err == nil {
-			cleanedAnything = true
-		} else if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Warning: failed to remove spawned file: %v\n", err)
-		}
+	// Remove symlink and spawned file (silent if missing)
+	os.Remove(entry.Path)
+	if spawnedPath, err := GetSpawnedPath(id); err == nil {
+		os.Remove(spawnedPath)
 	}
 
 	// Remove from manifest
-	if err := RemoveFromManifest(id); err != nil {
-		return fmt.Errorf("failed to update manifest: %w", err)
+	delete(manifest, id)
+	return SaveManifest(manifest)
+}
+
+// GetOrphanedLinkIDs returns IDs of manifest entries where the encrypted item no longer exists
+func GetOrphanedLinkIDs() []string {
+	manifest, err := LoadManifest()
+	if err != nil {
+		return nil
 	}
 
-	// Error only if we cleaned nothing (everything was already gone)
-	if !cleanedAnything {
-		return fmt.Errorf("nothing to clean up for item %s (symlink and spawned file already removed)", id)
+	var orphaned []string
+	for id := range manifest {
+		exists, _ := ItemExists(id)
+		if !exists {
+			orphaned = append(orphaned, id)
+		}
+	}
+	return orphaned
+}
+
+// GetOrphanedSpawnedFiles returns IDs of spawned files not tracked in manifest
+func GetOrphanedSpawnedFiles() []string {
+	manifest, err := LoadManifest()
+	if err != nil {
+		return nil
 	}
 
-	return nil
+	dredgeDir, err := GetDredgeDir()
+	if err != nil {
+		return nil
+	}
+
+	spawnedDir := filepath.Join(dredgeDir, spawnedDirName)
+	entries, err := os.ReadDir(spawnedDir)
+	if err != nil {
+		return nil
+	}
+
+	var orphaned []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		id := entry.Name()
+		if _, exists := manifest[id]; !exists {
+			orphaned = append(orphaned, id)
+		}
+	}
+	return orphaned
 }
