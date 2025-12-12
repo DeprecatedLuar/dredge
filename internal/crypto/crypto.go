@@ -15,6 +15,9 @@ import (
 	"github.com/DeprecatedLuar/dredge/internal/ui"
 )
 
+// Debug mode flag (set from main)
+var DebugMode bool
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -117,10 +120,16 @@ func Decrypt(encrypted []byte, password string) ([]byte, error) {
 
 	// Use cached password if available, otherwise use provided password
 	if cachedPassword != "" {
+		if DebugMode {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Decrypt: using CACHED password %q instead of provided %q\n", cachedPassword, password)
+		}
 		password = cachedPassword
 	} else if password == "" {
 		return nil, fmt.Errorf("no cached password and no password provided")
 	} else {
+		if DebugMode {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Decrypt: using PROVIDED password %q, caching it\n", password)
+		}
 		// Cache the password for this session
 		if err := CachePassword(password); err != nil {
 			// Non-fatal: continue even if caching fails
@@ -329,6 +338,9 @@ func VerifyPassword(password string) error {
 	// We need to verify THIS specific password, not fall back to cache
 	// So we temporarily clear cache, decrypt, then restore if needed
 	cachedPassword, _ := GetCachedPassword()
+	if DebugMode {
+		fmt.Fprintf(os.Stderr, "[DEBUG] VerifyPassword: cached=%q, provided=%q\n", cachedPassword, password)
+	}
 	_ = ClearSession() // Clear cache temporarily
 
 	decrypted, err := Decrypt(encrypted, password)
@@ -380,6 +392,11 @@ func GetPasswordWithVerification() (string, error) {
 	password, err := ui.PromptPassword()
 	if err != nil {
 		return "", fmt.Errorf("failed to prompt for password: %w", err)
+	}
+
+	// DEBUG: show what we received
+	if DebugMode {
+		fmt.Fprintf(os.Stderr, "[DEBUG] password len=%d bytes=%v\n", len(password), []byte(password))
 	}
 
 	if password == "" {

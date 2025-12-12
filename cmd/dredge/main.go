@@ -186,6 +186,9 @@ func main() {
 			},
 		},
 		Before: func(c *cli.Context) error {
+			// Set debug mode for crypto package
+			crypto.DebugMode = debugMode
+
 			// Check if this is a new session (no cached password)
 			isNewSession := !crypto.HasActiveSession()
 
