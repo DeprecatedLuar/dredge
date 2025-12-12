@@ -58,6 +58,7 @@ type Item struct {
 
 	Filename string  `toml:"filename,omitempty"`
 	Size     *int64  `toml:"size,omitempty"`
+	Mode     *uint32 `toml:"mode,omitempty"`
 
 	Content ItemContent `toml:"content"`
 }
