@@ -151,12 +151,13 @@ type = %q`,
 		formatTags(item.Tags),
 		item.Type)
 
-	// Add filename and size if present (from --file imports)
+	// Add filename and mode if present (from --file imports)
+	// Note: size is computed, not editable
 	if item.Filename != "" {
 		metadataTOML += fmt.Sprintf("\nfilename = %q", item.Filename)
 	}
-	if item.Size != nil {
-		metadataTOML += fmt.Sprintf("\nsize = %d", *item.Size)
+	if item.Mode != nil {
+		metadataTOML += fmt.Sprintf("\nmode = \"%o\"", *item.Mode)
 	}
 
 	// Open editor with metadata
@@ -171,10 +172,21 @@ type = %q`,
 		Tags     []string         `toml:"tags"`
 		Type     storage.ItemType `toml:"type"`
 		Filename string           `toml:"filename"`
-		Size     *int64           `toml:"size"`
+		Mode     string           `toml:"mode"`
 	}
 	if err := toml.Unmarshal([]byte(editedMetadata), &metadata); err != nil {
 		return fmt.Errorf("invalid metadata TOML: %w", err)
+	}
+
+	// Parse mode as octal string (e.g., "600" -> 0o600)
+	var parsedMode *uint32
+	if metadata.Mode != "" {
+		var m uint64
+		if _, err := fmt.Sscanf(metadata.Mode, "%o", &m); err != nil {
+			return fmt.Errorf("invalid mode %q (use octal like \"600\" or \"755\")", metadata.Mode)
+		}
+		mode32 := uint32(m)
+		parsedMode = &mode32
 	}
 
 	// Validate required fields
@@ -186,12 +198,13 @@ type = %q`,
 	}
 
 	// Update item with new metadata (timestamps auto-managed)
+	// Note: size preserved from original (computed, not editable)
 	item.Title = metadata.Title
 	item.Tags = metadata.Tags
 	item.Type = metadata.Type
 	item.Modified = time.Now()
 	item.Filename = metadata.Filename
-	item.Size = metadata.Size
+	item.Mode = parsedMode
 
 	// Save updated item
 	if err := storage.UpdateItem(id, item, password); err != nil {

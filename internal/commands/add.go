@@ -139,9 +139,10 @@ func handleAddFile(args []string, filePath string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Get filename and size
+	// Get filename, size, and permissions
 	filename := filepath.Base(filePath)
 	fileSize := fileInfo.Size()
+	fileMode := uint32(fileInfo.Mode().Perm())
 
 	// Use filename without extension as title if not provided
 	if title == "" {
@@ -160,6 +161,7 @@ func handleAddFile(args []string, filePath string) error {
 			Modified: time.Now(),
 			Filename: filename,
 			Size:     &fileSize,
+			Mode:     &fileMode,
 			Content: storage.ItemContent{
 				Text: string(fileBytes),
 			},
@@ -175,6 +177,7 @@ func handleAddFile(args []string, filePath string) error {
 			Modified: time.Now(),
 			Filename: filename,
 			Size:     &fileSize,
+			Mode:     &fileMode,
 			Content: storage.ItemContent{
 				Text: encoded,
 			},
