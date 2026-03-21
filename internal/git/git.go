@@ -11,83 +11,92 @@ import (
 
 // Constants
 const (
-	DefaultBranch    = "main"
 	GitIgnoreContent = `spawned/
 links.json
 `
 )
 
-// Init initializes or connects to a GitHub repository
-func Init(dredgeDir, repoSlug string) error {
-	// Check if gh CLI is available
-	if _, err := exec.LookPath("gh"); err != nil {
-		return fmt.Errorf("gh CLI not found - install from https://cli.github.com")
+// Init initializes a git repository for dredge and optionally connects a remote.
+//
+// If remote is empty, dredge runs in local-only mode (git repo without a remote).
+// If remote looks like "owner/repo", it is treated as a GitHub HTTPS shorthand.
+func Init(dredgeDir, remote string) error {
+	// Check if git is available
+	if _, err := exec.LookPath("git"); err != nil {
+		return fmt.Errorf("git not found - install git")
 	}
 
-	// Check if authenticated with GitHub
-	authCmd := exec.Command("gh", "auth", "status")
-	if err := authCmd.Run(); err != nil {
-		return fmt.Errorf("not authenticated with GitHub - run 'gh auth login' first")
-	}
-
-	// Check if directory exists
+	// Ensure dredge directory exists
 	if _, err := os.Stat(dredgeDir); os.IsNotExist(err) {
-		return fmt.Errorf("dredge directory not found: %s", dredgeDir)
+		if err := os.MkdirAll(dredgeDir, 0700); err != nil {
+			return fmt.Errorf("failed to create dredge directory: %w", err)
+		}
+	}
+
+	normalizedRemote, err := normalizeRemote(remote)
+	if err != nil {
+		return err
 	}
 
 	// Check if already a git repo
 	if isGitRepo(dredgeDir) {
-		// Already initialized, just verify remote
-		remote, err := runGitCommand(dredgeDir, "remote", "get-url", "origin")
-		if err == nil && remote != "" {
-			return fmt.Errorf("git repository already initialized with remote: %s", strings.TrimSpace(remote))
+		// Already initialized: if origin exists, do not overwrite.
+		existing, hasOrigin := getRemoteURL(dredgeDir, "origin")
+		if hasOrigin {
+			if normalizedRemote != "" && strings.TrimSpace(existing) != strings.TrimSpace(normalizedRemote) {
+				return fmt.Errorf("git remote 'origin' already set to %s", strings.TrimSpace(existing))
+			}
+			return nil
 		}
-		// Has .git but no remote, add it
-		if err := addRemote(dredgeDir, repoSlug); err != nil {
-			return err
+
+		// Repo exists but no origin yet: add if provided.
+		if normalizedRemote != "" {
+			if err := addRemote(dredgeDir, normalizedRemote); err != nil {
+				return err
+			}
+			fmt.Printf("Added remote: %s\n", normalizedRemote)
 		}
-		fmt.Printf("Added remote: %s\n", repoSlug)
 		return nil
 	}
 
 	// Not a git repo, initialize
-	if _, err := runGitCommand(dredgeDir, "init"); err != nil {
-		return fmt.Errorf("failed to initialize git: %w", err)
+	if err := initRepo(dredgeDir); err != nil {
+		return err
 	}
 
-	// Create .gitignore
+	// Ensure .gitignore contains our entries
 	gitignorePath := filepath.Join(dredgeDir, ".gitignore")
-	if err := os.WriteFile(gitignorePath, []byte(GitIgnoreContent), 0644); err != nil {
-		return fmt.Errorf("failed to create .gitignore: %w", err)
+	if err := ensureGitIgnore(gitignorePath, GitIgnoreContent); err != nil {
+		return err
 	}
 
-	// Check if GitHub repo exists, create if not
-	checkCmd := exec.Command("gh", "repo", "view", repoSlug)
-	if err := checkCmd.Run(); err != nil {
-		// Repo doesn't exist, create it
-		fmt.Printf("Creating private repository: %s\n", repoSlug)
-		createCmd := exec.Command("gh", "repo", "create", repoSlug, "--private", "--source", dredgeDir, "--remote", "origin")
-		createCmd.Dir = dredgeDir
-		if output, err := createCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to create GitHub repo: %s", string(output))
-		}
-	} else {
-		// Repo exists, just add remote
-		if err := addRemote(dredgeDir, repoSlug); err != nil {
+	// Add remote if provided
+	if normalizedRemote != "" {
+		if err := addRemote(dredgeDir, normalizedRemote); err != nil {
 			return err
 		}
 	}
 
-	// Initial commit and push if there are items
+	// Initial commit if there are items (and maybe push if remote present)
 	itemsDir := filepath.Join(dredgeDir, "items")
 	if entries, err := os.ReadDir(itemsDir); err == nil && len(entries) > 0 {
-		// Use centralized commit+push logic
-		if err := commitAndPush(dredgeDir, true); err != nil {
+		if err := commitInitial(dredgeDir); err != nil {
 			return err
 		}
-		fmt.Println("Initialized and pushed to GitHub")
+		if normalizedRemote != "" {
+			if err := pushToRemote(dredgeDir); err != nil {
+				return err
+			}
+			fmt.Println("Initialized and pushed")
+		} else {
+			fmt.Println("Initialized (local-only, no remote)")
+		}
 	} else {
-		fmt.Println("Initialized (no items to push yet)")
+		if normalizedRemote != "" {
+			fmt.Println("Initialized (no items to push yet)")
+		} else {
+			fmt.Println("Initialized (local-only, no remote)")
+		}
 	}
 
 	return nil
@@ -96,7 +105,11 @@ func Init(dredgeDir, repoSlug string) error {
 // Push commits and pushes changes to remote
 func Push(dredgeDir string) error {
 	if !isGitRepo(dredgeDir) {
-		return fmt.Errorf("not a git repository - run 'dredge init <user/repo>' first")
+		return fmt.Errorf("not a git repository - run 'dredge init [remote-url]' first")
+	}
+
+	if _, ok := getRemoteURL(dredgeDir, "origin"); !ok {
+		return fmt.Errorf("no git remote configured - run 'dredge init <remote-url>' or add 'origin'")
 	}
 
 	// Always stage tracked files first
@@ -122,7 +135,11 @@ func Push(dredgeDir string) error {
 // Pull pulls latest changes from remote
 func Pull(dredgeDir string) error {
 	if !isGitRepo(dredgeDir) {
-		return fmt.Errorf("not a git repository - run 'dredge init <user/repo>' first")
+		return fmt.Errorf("not a git repository - run 'dredge init [remote-url]' first")
+	}
+
+	if _, ok := getRemoteURL(dredgeDir, "origin"); !ok {
+		return fmt.Errorf("no git remote configured - run 'dredge init <remote-url>' or add 'origin'")
 	}
 
 	// Get current branch name
@@ -159,7 +176,7 @@ func Sync(dredgeDir string) error {
 // Status shows what changes will be pushed
 func Status(dredgeDir string) error {
 	if !isGitRepo(dredgeDir) {
-		return fmt.Errorf("not a git repository - run 'dredge init <user/repo>' first")
+		return fmt.Errorf("not a git repository - run 'dredge init [remote-url]' first")
 	}
 
 	// Stage tracked files to see what would be committed
@@ -182,29 +199,20 @@ func Status(dredgeDir string) error {
 
 	// Print colored changes
 	printColoredChanges(changes)
+	if _, ok := getRemoteURL(dredgeDir, "origin"); !ok {
+		fmt.Println("\n(no remote configured - local-only mode)")
+	}
 	return nil
 }
 
-// commitAndPush is the core commit+push workflow used by Init
-func commitAndPush(dir string, isInitial bool) error {
-	// Add tracked files
+func commitInitial(dir string) error {
 	if err := addTrackedFiles(dir); err != nil {
 		return err
 	}
-
-	// Create commit (initial or smart message)
-	if isInitial {
-		if _, err := runGitCommand(dir, "commit", "-m", "Initial commit"); err != nil {
-			return fmt.Errorf("failed to create initial commit: %w", err)
-		}
-	} else {
-		if err := commitChanges(dir); err != nil {
-			return err
-		}
+	if _, err := runGitCommand(dir, "commit", "-m", "Initial commit"); err != nil {
+		return fmt.Errorf("failed to create initial commit: %w", err)
 	}
-
-	// Push to remote
-	return pushToRemote(dir)
+	return nil
 }
 
 // addTrackedFiles adds items/ and .dredge-key to git staging
@@ -452,11 +460,93 @@ func printColoredChanges(changes map[string][]string) {
 	}
 }
 
-// addRemote adds a git remote using HTTPS (works with gh CLI auth)
-func addRemote(dir, repoSlug string) error {
-	remoteURL := fmt.Sprintf("https://github.com/%s.git", repoSlug)
+// addRemote adds a git remote named origin.
+func addRemote(dir, remoteURL string) error {
 	if _, err := runGitCommand(dir, "remote", "add", "origin", remoteURL); err != nil {
 		return fmt.Errorf("failed to add remote: %w", err)
+	}
+	return nil
+}
+
+func getRemoteURL(dir, name string) (string, bool) {
+	out, err := runGitCommand(dir, "remote", "get-url", name)
+	if err != nil {
+		return "", false
+	}
+	url := strings.TrimSpace(out)
+	if url == "" {
+		return "", false
+	}
+	return url, true
+}
+
+func normalizeRemote(remote string) (string, error) {
+	r := strings.TrimSpace(remote)
+	if r == "" {
+		return "", nil
+	}
+
+	// GitHub shorthand: owner/repo
+	if strings.Count(r, "/") == 1 &&
+		!strings.Contains(r, ":") &&
+		!strings.Contains(r, " ") &&
+		!strings.HasPrefix(r, "./") &&
+		!strings.HasPrefix(r, "../") &&
+		!strings.HasPrefix(r, "/") &&
+		!strings.HasSuffix(r, ".git") {
+		return fmt.Sprintf("https://github.com/%s.git", r), nil
+	}
+
+	return r, nil
+}
+
+func initRepo(dir string) error {
+	// Use the user's configured git default branch (init.defaultBranch).
+	if _, err := runGitCommand(dir, "init"); err != nil {
+		return fmt.Errorf("failed to initialize git: %w", err)
+	}
+	return nil
+}
+
+func ensureGitIgnore(path string, content string) error {
+	// If missing, create as-is.
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to create .gitignore: %w", err)
+		}
+		return nil
+	}
+
+	// If present, append any missing lines.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read .gitignore: %w", err)
+	}
+	existing := string(data)
+
+	missing := []string{}
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// match whole-line, simple contains is fine for our small patterns
+		if !strings.Contains(existing, line) {
+			missing = append(missing, line)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	toAppend := "\n" + strings.Join(missing, "\n") + "\n"
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open .gitignore: %w", err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(toAppend); err != nil {
+		return fmt.Errorf("failed to update .gitignore: %w", err)
 	}
 	return nil
 }

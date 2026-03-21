@@ -11,11 +11,14 @@ import (
 )
 
 func HandleInit(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: dredge init <user/repo>")
+	if len(args) > 1 {
+		return fmt.Errorf("usage: dredge init [remote-url]")
 	}
 
-	repoSlug := args[0]
+	remote := ""
+	if len(args) == 1 {
+		remote = args[0]
+	}
 
 	// Get dredge directory
 	dredgeDir, err := storage.GetDredgeDir()
@@ -23,8 +26,8 @@ func HandleInit(args []string) error {
 		return fmt.Errorf("failed to get dredge directory: %w", err)
 	}
 
-	// Initialize git repository
-	return git.Init(dredgeDir, repoSlug)
+	// Initialize git repository (and optionally connect remote)
+	return git.Init(dredgeDir, remote)
 }
 
 // EnsureInitialized checks if a git repo is connected and prompts for one if not.
@@ -39,21 +42,18 @@ func EnsureInitialized() error {
 		return nil
 	}
 
-	fmt.Fprintln(os.Stderr, "No GitHub repository connected.")
-	fmt.Fprint(os.Stderr, "Enter your user/repo (e.g. alice/dredge-vault): ")
+	fmt.Fprintln(os.Stderr, "No git repository initialized for dredge.")
+	fmt.Fprint(os.Stderr, "Enter remote git URL (or leave empty for local-only): ")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	if !scanner.Scan() {
 		return fmt.Errorf("no input provided")
 	}
-	repoSlug := strings.TrimSpace(scanner.Text())
-	if repoSlug == "" {
-		return fmt.Errorf("repository cannot be empty")
-	}
+	remote := strings.TrimSpace(scanner.Text())
 
 	if err := os.MkdirAll(dredgeDir, 0700); err != nil {
 		return fmt.Errorf("failed to create dredge directory: %w", err)
 	}
 
-	return git.Init(dredgeDir, repoSlug)
+	return git.Init(dredgeDir, remote)
 }

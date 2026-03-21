@@ -90,7 +90,7 @@ mv dredge ~/.local/bin/
 </details>
 
 
-Git sync requires the [gh CLI](https://cli.github.com/) authenticated.
+Git sync uses plain `git` and works with any remote (GitHub/GitLab/Gitea/etc).
 
 <details>
 <summary>Quick start</summary>
@@ -98,8 +98,9 @@ Git sync requires the [gh CLI](https://cli.github.com/) authenticated.
 <br>
 
 ```bash
-# Initialize with a GitHub repo (creates it if it doesn't exist)
-dredge init yourusername/vault
+# Initialize with an existing git remote
+dredge init yourusername/vault   # GitHub shorthand
+# or: dredge init git@gitlab.com:you/vault.git
 
 # Add your first item
 dredge add "OpenAI Key" -c "sk-..." -t keys api #opens the editor without -c flag
@@ -248,4 +249,4 @@ I wanted something that just works. No organization to maintain, no fragmentatio
 
 [jrnl](https://jrnl.sh) pointed me in the right direction but wasn't very QoL leaning — It literally had no item separation and a search that matched *everything* Dredge is what I actually wanted. (so yeah pretty much a personal tool)
 
-> **Note:** Currently requires GitHub via the `gh` CLI. Local-only mode and support for other git providers are planned.
+> **Note:** Dredge does not create remote repositories for you. Create a repo on your provider, then run `dredge init <remote-url>` (or `dredge init owner/repo` as a GitHub shorthand).
