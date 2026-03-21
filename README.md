@@ -92,6 +92,37 @@ mv dredge ~/.local/bin/
 
 Git sync uses plain `git` and works with any remote (GitHub/GitLab/Gitea/etc).
 
+### Acceptable remotes for `dredge init`
+
+`dredge init` accepts an optional git remote. If you omit it, dredge initializes a local-only git repo (no remote).
+
+Accepted remote formats:
+
+```bash
+# GitHub shorthand (expanded to https://github.com/<owner>/<repo>.git)
+dredge init owner/repo
+
+# HTTPS
+dredge init https://github.com/owner/repo.git
+dredge init https://gitlab.com/group/repo.git
+
+# SSH (scp-like)
+dredge init git@github.com:owner/repo.git
+dredge init git@gitlab.com:group/repo.git
+
+# SSH URL
+dredge init ssh://git@github.com/owner/repo.git
+
+# Local path remote (advanced)
+dredge init /srv/git/dredge-vault.git
+```
+
+Notes:
+
+- Dredge does not create remote repositories for you.
+- If `origin` is not configured, `dredge push`/`pull`/`sync` will error with guidance.
+- If you already have a git remote set, `dredge init` will not overwrite it.
+
 <details>
 <summary>Quick start</summary>
 
