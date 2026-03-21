@@ -25,6 +25,11 @@ This is NOT a password manager. NOT a notes app. NOT a deep-sea benthic abberant
 
 ---
 
+
+<div align="center">
+<img src="other/assets/dredge-banner-2.webp" width="800"/>
+</div>
+
 <!-- You:
     AWS key is in 1Password. Your SSH config can't live in your dotfiles — it's sensitive. Your 7 email passwords are _somewhere_ you just gotta find it. AI prompts are in Notion and Google docs. Env vars are in another repo.
 
@@ -67,9 +72,6 @@ mv dredge /usr/local/bin/
 
 </details>
 
-<div align="center">
-<img src="other/assets/dredge-banner-2.webp" width="800"/>
-</div>
 
 Git sync requires the [gh CLI](https://cli.github.com/) authenticated.
 
