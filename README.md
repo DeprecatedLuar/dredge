@@ -186,7 +186,7 @@ I have no clue what YOU want to store. The flexibility is the point. But to give
 - Argon2id key derivation
 - Password cached per terminal session in `/run` — gone when the session ends
 - Nothing decrypted to disk unless you explicitly link it
-- Private git repo — you own the storage, no accounts, no telemetry, no cloud service
+- Private git repo (GitHub-backed for now, offline folder support coming in next update) — you own the storage, no telemetry
 
 ---
 
