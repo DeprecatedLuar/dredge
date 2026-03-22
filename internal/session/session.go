@@ -13,13 +13,9 @@ const (
 )
 
 // Dir returns the session-specific directory path.
-// Uses XDG_RUNTIME_DIR if set, otherwise falls back to /run/user/$UID/dredge/$PPID.
+// The base runtime directory is resolved per-platform by runtimeDir() (see session_*.go).
 func Dir() string {
-	runtime := os.Getenv("XDG_RUNTIME_DIR")
-	if runtime == "" {
-		runtime = fmt.Sprintf("/run/user/%d", os.Getuid())
-	}
-	return filepath.Join(runtime, "dredge", fmt.Sprintf("%d", os.Getppid()))
+	return filepath.Join(runtimeDir(), "dredge", fmt.Sprintf("%d", os.Getppid()))
 }
 
 func ensureDir() error {
