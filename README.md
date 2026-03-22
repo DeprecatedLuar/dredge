@@ -351,3 +351,20 @@ I wanted something that just works. No organization to maintain, no fragmentatio
 <div align="center">
 <img src="other/assets/fish/dredge-eel-sprouting.webp" width="600"/>
 </div>
+
+---
+
+<h2><img height="32" src="other/assets/fish/dredge-squid-radiant.webp"/> Contributors</h2>
+
+Big thanks to you guys who contributed to dredge:
+
+<table>
+<tr>
+  <td align="center">
+    <a href="https://github.com/timcondit"><img src="https://github.com/timcondit.png" width="48" /><br/>timcondit</a>
+  </td>
+  <td align="center">
+    <a href="https://github.com/wlad031"><img src="https://github.com/wlad031.png" width="48" /><br/>wlad031</a>
+  </td>
+</tr>
+</table>
