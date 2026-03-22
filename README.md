@@ -32,6 +32,8 @@ Search, don't organize. **_Notes, configs, keys, secrets_** — five seconds fro
 
 ---
 
+> *"Do not bother me with common clutter."* — The Fishmonger
+
 <div align="center">
 <!-- demo gif -->
 <img src="other/assets/demo.gif" alt="dredge demo" width="800"/>
@@ -164,6 +166,8 @@ dredge sync          # pull + push
 
 <h2><img height="32" src="other/assets/fish/dredge-octopus-glowing.webp"/> How it works</h2>
 
+> *"I can't imagine what's down there in the deep."* — The Lighthouse Keeper
+
 Dredge stores everything as encrypted files in `~/.local/share/dredge/`. That directory is also a git repository — so `dredge push` just commits and pushes it. Each item is a standalone encrypted blob with a random 3-character ID. No filenames, no readable metadata from the outside.
 
 ### The encryption pipeline
@@ -227,6 +231,8 @@ Subsequent commands in the same terminal use the cached key — no password prom
 ---
 
 <h2><img height="56" src="other/assets/fish/dredge-shark-whaler.webp"/> Security</h2>
+
+> *"Better to come back with a small catch than to not come back at all."* — The Fishmonger
 
 ### Threat model
 
@@ -339,6 +345,8 @@ dredge init /srv/git/dredge-vault.git
 ---
 
 <h2><img height="32" src="other/assets/fish/dredge-jellyfish-aurora.webp"/> Why</h2>
+
+> *"I am a collector — of many things; art and artifacts, treasures and truths... and curios that occupy the periphery of desire."* — The Collector
 
 The mental overhead of saving something and not knowing where to find it when you need it.
 
