@@ -53,21 +53,21 @@ go install github.com/DeprecatedLuar/dredge/cmd/dredge@latest
 
 <h2><img height="44" src="other/assets/fish/dredge-blackmouth.webp"/> The cool features you've never seen before</h2>
 
-- **Encrypted storage** — Clone the repo and get absolute cryptic gibberish. Useless without your password. (AES-256-GCM + Argon2id)
-- **Instant search** — fuzzy, typo-tolerant. Type what you remember, not what you saved.
-- **Store anything** — notes, scripts, dotfiles, images, zip archives. If it's a file, it goes in.
-- **Live file linking** — symlink any item to a system path. Edit directly or through dredge — changes sync both ways.
-- **Git-backed** — private repo you own. `git clone` it anywhere and you have everything.
-- **Session password** — one prompt per terminal session. After that, it stays out of your way.
-- **Trash + undo** — deleted items go to trash. So `dredge undo` brings them back.
+- **Encrypted storage** — Clone the repo and get absolute cryptic gibberish. You can't even tell what's in the repo without the password. (I used AES-256-GCM + Argon2id)
+- **Instant search** — I made a custom fuzzy search algorithm because I'm lazy and want the right entry among 300 others in milissecond without having to think about it.
+- **Store anything** — notes, scripts, dotfiles, images, zip archives. If it's a file and it exists it can be stored in dredge.
+- **Live file linking** — Cool feature, symlink any item to a system path so you can read and edit directly or through dredge. Any changes sync both ways with the repo.
+- **Git-backed** — private repo you own. So just `git clone` it and you have your data.
+- **Session password** — One prompt per terminal session. After that, you can use passwordless untill you kill the terminal. (read the security session to understand better)
+- **Trash + undo** — deleted items go to trash. So just use `dredge undo` if you delete accidentally.
 
 ---
 
 <h2><img height="32" src="other/assets/fish/dredge-squid-firefly.webp"/> What to store in dredge?</h2>
 
-Dredge doesn't judge. API keys shown only once, SSH configs, AI prompts, passwords, scripts you keep rewriting, email templates you always retype, dotfiles, zip archives, movie lists, anything you've Googled more than once.
+I won't judge you. Annoying API keys that show only once, SSH config, AI prompts, passwords, literal shell scripts you can execute, email templates?, dotfiles (weird but will work fine), zip archives, movie list, lists of URLs for quick access...
 
-Even a _legal_ copy of Chainsaw Man chapter 2 in Japanese.
+Even a _legal_ copy of Chainsaw Man chapter 2 in Japanese. (I may or not have that one specifically)
 
 ---
 
@@ -82,11 +82,11 @@ go install github.com/DeprecatedLuar/dredge/cmd/dredge@latest
 Make sure `$GOPATH/bin` (usually `~/go/bin`) is in your `PATH`.
 
 <details>
-<summary>No Go? Use the install script</summary>
+<summary>If you don't have Go. Install script here.</summary>
 
 <br>
 
-Downloads a pre-built binary — no Go required. The script delegates to [the-satellite](https://github.com/DeprecatedLuar/the-satellite), a reusable installer library I use across projects for OS/arch detection and binary downloads.
+Downloads a pre-built binary from releases. The script delegates to [the-satellite](https://github.com/DeprecatedLuar/the-satellite), a reusable installer library I use across projects for OS/arch detection and binary downloads. (I promise I'm not selling your data to China nor reading it)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/DeprecatedLuar/dredge/main/install.sh | bash
@@ -275,17 +275,17 @@ Link any stored item to a path on your filesystem:
 dredge link <id> ~/.ssh/config
 ```
 
-Creates a symlink at `~/.ssh/config` pointing to a plain-text copy dredge manages. Edit the file directly or through `dredge edit` — changes sync back to the encrypted store automatically.
+This command will make a symlink at `~/.ssh/config` pointing to a plaintext copy dredge manages (the file gets exposed to disk so you can use it). You can edit the file directly or through `dredge edit` or whatever you feel like, all changes sync back to the encrypted store automatically.
 
 On a new machine:
 
 ```bash
 git clone git@github.com:you/vault.git ~/.local/share/dredge
 dredge link <id> ~/.ssh/config
-# done — same SSH config, same keys, every machine
+#  same SSH config, same keys, every machine git tracked for any update
 ```
 
-This is the reason I built dredge. My SSH config is identical on every machine, encrypted in git, and I never think about it.
+This is _actually_ the reason I built dredge. My SSH config is identical on every machine, but I couldn't just slap them inside my dotfiles.
 
 ---
 
@@ -314,7 +314,7 @@ This is the reason I built dredge. My SSH config is identical on every machine, 
 
 </div>
 
-### Git sync
+### Git sync (by wlad031)
 
 Git sync uses plain `git` and works with any remote (GitHub/GitLab/Gitea/etc).
 
@@ -353,11 +353,11 @@ dredge init /srv/git/dredge-vault.git
 
 The mental overhead of saving something and not knowing where to find it when you need it.
 
-I got tired of having important things scattered everywhere — password manager for passwords, note app for notes, a separate dotfiles repo, a `notes.txt` on the desktop. Every tool does one thing and you end up managing the tools instead of the information.
+I got pissed of having important things (and non-important too just things in general) scattered everywhere, I would have to access an email acc I made 6 years ago because it was linked a random service I urgently had to access for no reason whatsoever... Anyways, I realized that a lot of tools despite having their gimmics they all overlap on a very important aspect which is storing information, so I made a tool that specializes on _that_ specific overlap and leaves the tools to do what they are best at.
 
-I wanted something that just works. No organization to maintain, no fragmentation. Dump it in, find it when you need it, done.
+I'm lazy so I wanted something that just works and reads my mind, takes no effort to add an entry nor retrieve it from the knowledge base.
 
-[jrnl](https://jrnl.sh) pointed me in the right direction but wasn't very QoL leaning — it literally had no item separation and a search that matched *everything*. Dredge is what I actually wanted. (so yeah, pretty much a personal tool)
+I downloaded [jrnl](https://jrnl.sh) once and I really liked the idea but hated the execution due to some weird parameters, it literally had no item separation and a search that matched *everything*. Dredge is what I actually wanted. (so yeah, pretty much a personal tool)
 
 <div align="center">
 <img src="other/assets/fish/dredge-eel-sprouting.webp" width="600"/>
