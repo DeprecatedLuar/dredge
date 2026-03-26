@@ -234,14 +234,17 @@ func main() {
 				}
 			}
 
-			// Run self-healing on new session
-			if isNewSession {
+			// Determine the subcommand (empty string means no args → show help)
+			sub := c.Args().First()
+			isHelpCommand := sub == "" || sub == "help" || sub == "h"
+
+			// Run self-healing on new session (skip for help — no vault access needed)
+			if isNewSession && !isHelpCommand {
 				selfheal.Run()
 			}
 
 			// Ensure a git repo is connected (skip for init/help — those don't need it)
-			sub := c.Args().First()
-			if !devMode && sub != "init" && sub != "help" && sub != "h" && sub != "update" && sub != "up" {
+			if !devMode && !isHelpCommand && sub != "init" && sub != "update" && sub != "up" {
 				if err := commands.EnsureInitialized(); err != nil {
 					return err
 				}
