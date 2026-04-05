@@ -260,7 +260,8 @@ The spawned file is the only persistent plaintext on disk, and it only exists be
 
 ### Caveats
 
-- **`--password` flag:** Passing your password inline exposes it in shell history and `ps` output. Avoid it in shared environments.
+- **`--password` / `DREDGE_PASSWORD`:** Passing your password inline exposes it in shell history and `ps` output. Env vars can leak to child processes. Avoid both in shared environments.
+- **`--vault` / `DREDGE_VAULT`:** Override the active vault for a single command without persisting the change. Useful for scripting across multiple vaults.
 - **Linked items:** A linked item's plaintext lives at the symlink target (e.g. `~/.ssh/config`). It is not git-tracked, but it is on disk in plaintext.
 
 <div align="center">
@@ -309,7 +310,7 @@ This is _actually_ the reason I built dredge. My SSH config is identical on ever
 | `export` | Export a file item to disk | `dredge export xKP ./output/` |
 | `copy` / `cp` | Copy item content to clipboard | `dredge copy xKP` |
 | `lock` | Lock the vault (clears session key) | `dredge lock` |
-| `init` | Initialize git repository | `dredge init owner/repo` |
+| `init` / `use` | Initialize or activate a vault | `dredge init ~/vaults/work` |
 | `push` / `pull` / `sync` | Git sync | `dredge sync` |
 | `status` | Show pending changes | `dredge status` |
 | `passwd` | Change vault password | `dredge passwd` |
