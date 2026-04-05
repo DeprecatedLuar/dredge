@@ -159,7 +159,40 @@ func syncItemIfNeeded(id string, key []byte) error {
 		return nil
 	}
 
-	currentHash, _ := hashSpawnedFile(id)
+	currentHash, hashErr := hashSpawnedFile(id)
+
+	// Spawned file missing → recreate it from the encrypted item
+	if hashErr != nil {
+		spawnedPath, _ := GetSpawnedPath(id)
+		if os.IsNotExist(hashErr) {
+			itemPath, _ := GetItemPath(id)
+			encryptedData, err := os.ReadFile(itemPath)
+			if err != nil {
+				return err
+			}
+			decryptedData, err := crypto.Decrypt(encryptedData, key)
+			if err != nil {
+				return err
+			}
+			var item Item
+			if err := toml.Unmarshal(decryptedData, &item); err != nil {
+				return err
+			}
+			if err := CreateSpawnedFile(id, item.Content.Text); err != nil {
+				return err
+			}
+			// Recreate symlink if broken
+			if _, err := os.Lstat(entry.Path); os.IsNotExist(err) {
+				os.Symlink(spawnedPath, entry.Path)
+			}
+			newHash, _ := hashSpawnedFile(id)
+			entry.Hash = newHash
+			manifest[id] = entry
+			return SaveManifest(manifest)
+		}
+		return hashErr
+	}
+
 	if currentHash == entry.Hash {
 		return nil
 	}
