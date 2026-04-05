@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,12 @@ func main() {
 				Name:    "password",
 				Aliases: []string{"p"},
 				Usage:   "Password for decryption (skips prompt)",
+				EnvVars: []string{"DREDGE_PASSWORD"},
+			},
+			&cli.StringFlag{
+				Name:    "vault",
+				Usage:   "Vault directory to use for this command (does not persist)",
+				EnvVars: []string{"DREDGE_VAULT"},
 			},
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -172,8 +179,9 @@ func main() {
 				},
 			},
 			{
-				Name:  "init",
-				Usage: "Initialize a vault at the given path (default: current dir)",
+				Name:    "init",
+				Aliases: []string{"use"},
+				Usage:   "Initialize or activate a vault at the given path (default: current dir)",
 				Action: func(c *cli.Context) error {
 					return commands.HandleInit(c.Args().Slice())
 				},
@@ -237,8 +245,15 @@ func main() {
 			},
 		},
 		Before: func(c *cli.Context) error {
-			// Register active vault path — must be first (used by session key scoping and verify file)
-			if vaultDir, err := storage.GetDredgeDir(); err == nil {
+			// If --vault/DREDGE_VAULT is set, override for this invocation only
+			if v := strings.TrimSpace(c.String("vault")); v != "" {
+				abs, err := filepath.Abs(v)
+				if err != nil {
+					return fmt.Errorf("failed to resolve vault path: %w", err)
+				}
+				storage.SetVaultOverride(abs)
+				session.SetVaultPath(abs)
+			} else if vaultDir, err := storage.GetDredgeDir(); err == nil {
 				session.SetVaultPath(vaultDir)
 			}
 
@@ -277,7 +292,7 @@ func main() {
 			sub := c.Args().First()
 
 			// Commands that don't need vault access
-			passiveCommands := []string{"", "help", "h", "update", "up", "init", "lock"}
+			passiveCommands := []string{"", "help", "h", "update", "up", "init", "use", "lock"}
 
 			contains := func(list []string, s string) bool {
 				for _, v := range list {
@@ -343,6 +358,7 @@ func main() {
 		os.Exit(1)
 	}
 }
+
 
 func Debugf(format string, args ...any) {
 	if debugMode {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -42,6 +43,24 @@ const (
 	// Gitignore content
 	gitignoreContent = ".spawned/\nlinks.json\n"
 )
+
+var (
+	vaultOverrideMu sync.RWMutex
+	vaultOverride   string
+)
+
+// SetVaultOverride sets a process-local vault directory override (empty string clears it).
+func SetVaultOverride(path string) {
+	vaultOverrideMu.Lock()
+	defer vaultOverrideMu.Unlock()
+	vaultOverride = path
+}
+
+func getVaultOverride() string {
+	vaultOverrideMu.RLock()
+	defer vaultOverrideMu.RUnlock()
+	return vaultOverride
+}
 
 // ItemType represents the type of content stored in an item
 type ItemType string
@@ -150,8 +169,11 @@ func SetActivePath(path string) error {
 }
 
 // GetDredgeDir returns the active vault directory path.
-// If no active vault is set, falls back to the registry directory (backward compat).
+// Precedence: process override → active registry → fallback to registry dir.
 func GetDredgeDir() (string, error) {
+	if ov := getVaultOverride(); ov != "" {
+		return ov, nil
+	}
 	active, err := GetActivePath()
 	if err != nil {
 		return "", err
