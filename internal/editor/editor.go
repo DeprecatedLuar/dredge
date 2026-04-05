@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DeprecatedLuar/dredge/internal/session"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/session"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 const (

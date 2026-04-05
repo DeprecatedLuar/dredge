@@ -1,6 +1,6 @@
 package selfheal
 
-import "github.com/DeprecatedLuar/dredge/internal/storage"
+import "github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 
 // Run performs silent health checks and cleanup once per session
 func Run() {

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 func HandleExport(args []string) error {

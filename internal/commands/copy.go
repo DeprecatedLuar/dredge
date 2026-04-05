@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
-	"github.com/DeprecatedLuar/dredge/internal/ui"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/ui"
 )
 
 func HandleCopy(args []string) error {

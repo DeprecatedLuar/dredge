@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/DeprecatedLuar/dredge/internal/session"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/session"
 )
 
 func TestCreateAndVerifyPassword(t *testing.T) {

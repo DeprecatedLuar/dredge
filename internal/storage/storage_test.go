@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
 )
 
 // testKey is a deterministic 32-byte key used across storage tests.

@@ -81,26 +81,26 @@ jobs:
     #     cat > ${BINARY_NAME}.rb <<'EOF'
     #     class ${BINARY_NAME^} < Formula
     #       desc "Encrypted storage for secrets, credentials, and config files"
-    #       homepage "https://github.com/DeprecatedLuar/dredge"
+    #       homepage "https://github.com/DeprecatedLuar/dredge-cargo"
     #       version "VERSION_NO_V_PLACEHOLDER"
     #       license "MIT"
     #
     #       on_macos do
     #         if Hardware::CPU.arm?
-    #           url "https://github.com/DeprecatedLuar/dredge/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_darwin_arm64"
+    #           url "https://github.com/DeprecatedLuar/dredge-cargo/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_darwin_arm64"
     #           sha256 "SHA_DARWIN_ARM64_PLACEHOLDER"
     #         else
-    #           url "https://github.com/DeprecatedLuar/dredge/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_darwin_amd64"
+    #           url "https://github.com/DeprecatedLuar/dredge-cargo/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_darwin_amd64"
     #           sha256 "SHA_DARWIN_AMD64_PLACEHOLDER"
     #         end
     #       end
     #
     #       on_linux do
     #         if Hardware::CPU.arm?
-    #           url "https://github.com/DeprecatedLuar/dredge/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_linux_arm64"
+    #           url "https://github.com/DeprecatedLuar/dredge-cargo/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_linux_arm64"
     #           sha256 "SHA_LINUX_ARM64_PLACEHOLDER"
     #         else
-    #           url "https://github.com/DeprecatedLuar/dredge/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_linux_amd64"
+    #           url "https://github.com/DeprecatedLuar/dredge-cargo/releases/download/VERSION_PLACEHOLDER/${BINARY_NAME}_linux_amd64"
     #           sha256 "SHA_LINUX_AMD64_PLACEHOLDER"
     #         end
     #       end

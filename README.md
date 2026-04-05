@@ -18,14 +18,14 @@ Search, don't organize. **_Notes, configs, keys, secrets_** — five seconds fro
 </div>
 
 <div align="center">
-  <a href="https://github.com/DeprecatedLuar/dredge/stargazers">
-    <img src="https://img.shields.io/github/stars/DeprecatedLuar/dredge?style=for-the-badge&logo=github&color=1f6feb&logoColor=white&labelColor=black"/>
+  <a href="https://github.com/DeprecatedLuar/dredge-cargo/stargazers">
+    <img src="https://img.shields.io/github/stars/DeprecatedLuar/dredge-cargo?style=for-the-badge&logo=github&color=1f6feb&logoColor=white&labelColor=black"/>
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/github/license/DeprecatedLuar/dredge?style=for-the-badge&color=green&labelColor=black"/>
+    <img src="https://img.shields.io/github/license/DeprecatedLuar/dredge-cargo?style=for-the-badge&color=green&labelColor=black"/>
   </a>
-  <a href="https://github.com/DeprecatedLuar/dredge/releases">
-    <img src="https://img.shields.io/github/v/release/DeprecatedLuar/dredge?style=for-the-badge&color=orange&labelColor=black"/>
+  <a href="https://github.com/DeprecatedLuar/dredge-cargo/releases">
+    <img src="https://img.shields.io/github/v/release/DeprecatedLuar/dredge-cargo?style=for-the-badge&color=orange&labelColor=black"/>
   </a>
 </div>
 
@@ -40,7 +40,7 @@ Search, don't organize. **_Notes, configs, keys, secrets_** — five seconds fro
 </div>
 
 ```bash
-go install github.com/DeprecatedLuar/dredge/cmd/dredge@latest
+go install github.com/DeprecatedLuar/dredge-cargo/cmd/dredge@latest
 ```
 
 <div align="right">
@@ -76,7 +76,7 @@ Even a _legal_ copy of Chainsaw Man chapter 2 in Japanese. (I may or not have th
 **If you have Go:**
 
 ```bash
-go install github.com/DeprecatedLuar/dredge/cmd/dredge@latest
+go install github.com/DeprecatedLuar/dredge-cargo/cmd/dredge@latest
 ```
 
 Make sure `$GOPATH/bin` (usually `~/go/bin`) is in your `PATH`.
@@ -89,7 +89,7 @@ Make sure `$GOPATH/bin` (usually `~/go/bin`) is in your `PATH`.
 Downloads a pre-built binary from releases. The script delegates to [the-satellite](https://github.com/DeprecatedLuar/the-satellite), a reusable installer library I use across projects for OS/arch detection and binary downloads. (I promise I'm not selling your data to China nor reading it)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/DeprecatedLuar/the-satellite/main/satellite.sh | bash -s -- install DeprecatedLuar/dredge
+curl -sSL https://raw.githubusercontent.com/DeprecatedLuar/the-satellite/main/satellite.sh | bash -s -- install DeprecatedLuar/dredge-cargo
 ```
 
 </details>
@@ -100,7 +100,7 @@ curl -sSL https://raw.githubusercontent.com/DeprecatedLuar/the-satellite/main/sa
 <br>
 
 ```bash
-git clone https://github.com/DeprecatedLuar/dredge
+git clone https://github.com/DeprecatedLuar/dredge-cargo
 cd dredge
 go build -o dredge ./cmd/dredge
 mv dredge ~/.local/bin/

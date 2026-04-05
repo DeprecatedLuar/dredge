@@ -1,4 +1,4 @@
-module github.com/DeprecatedLuar/dredge
+module github.com/DeprecatedLuar/dredge-cargo
 
 go 1.25.5
 

@@ -5,7 +5,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 var idPattern = regexp.MustCompile(`^[a-zA-Z0-9]{3}$`)

@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/crypto/argon2"
 
-	"github.com/DeprecatedLuar/dredge/internal/session"
-	"github.com/DeprecatedLuar/dredge/internal/ui"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/session"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/ui"
 )
 
 // Debug mode flag (set from main)

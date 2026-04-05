@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/editor"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/editor"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 func HandleEdit(args []string) error {

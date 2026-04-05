@@ -11,11 +11,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/editor"
-	"github.com/DeprecatedLuar/dredge/internal/git"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
-	"github.com/DeprecatedLuar/dredge/internal/ui"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/editor"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/git"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/ui"
 )
 
 // warnIfUnpushed prints a dim warning if the git repo has uncommitted or unpushed changes.

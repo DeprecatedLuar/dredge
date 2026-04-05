@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/git"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/git"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 // HandleInit bootstraps a vault at the given path (default: current dir) and activates it.

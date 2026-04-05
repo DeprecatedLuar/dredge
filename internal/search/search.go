@@ -3,7 +3,7 @@ package search
 import (
 	"strings"
 
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 	"github.com/hbollon/go-edlib"
 )
 

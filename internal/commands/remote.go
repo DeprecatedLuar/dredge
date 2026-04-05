@@ -3,8 +3,8 @@ package commands
 import (
 	"fmt"
 
-	"github.com/DeprecatedLuar/dredge/internal/git"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/git"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 // HandleRemote wires a git remote to the current active vault.

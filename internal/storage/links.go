@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
 )
 
 const (

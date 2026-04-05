@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
 func TestSearch_SimpleQuery(t *testing.T) {

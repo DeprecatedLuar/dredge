@@ -5,10 +5,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/session"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
-	"github.com/DeprecatedLuar/dredge/internal/ui"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/session"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/ui"
 )
 
 func HandleList(args []string) error {

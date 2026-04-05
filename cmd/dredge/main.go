@@ -9,14 +9,14 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/DeprecatedLuar/dredge/internal/commands"
-	"github.com/DeprecatedLuar/dredge/internal/crypto"
-	"github.com/DeprecatedLuar/dredge/internal/selfheal"
-	"github.com/DeprecatedLuar/dredge/internal/session"
-	"github.com/DeprecatedLuar/dredge/internal/storage"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/commands"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/crypto"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/selfheal"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/session"
+	"github.com/DeprecatedLuar/dredge-cargo/internal/storage"
 )
 
-const githubRepo = "DeprecatedLuar/dredge"
+const githubRepo = "DeprecatedLuar/dredge-cargo"
 
 var version = "dev"
 
