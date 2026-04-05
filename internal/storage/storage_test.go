@@ -14,6 +14,7 @@ var testKey = crypto.DeriveKey("test-password-123", []byte("16-byte-salt-val"))
 // setupTestEnv creates a temporary test directory and clears session cache
 func setupTestEnv(t *testing.T) (cleanup func()) {
 	_ = crypto.ClearSession()
+	SetVaultOverride("")
 
 	tmpDir, err := os.MkdirTemp("", "dredge-test-*")
 	if err != nil {
@@ -23,9 +24,17 @@ func setupTestEnv(t *testing.T) (cleanup func()) {
 	// Set XDG_DATA_HOME to temp directory
 	oldXDG := os.Getenv("XDG_DATA_HOME")
 	os.Setenv("XDG_DATA_HOME", tmpDir)
+	oldVault := os.Getenv("DREDGE_VAULT")
+	os.Unsetenv("DREDGE_VAULT")
 
 	return func() {
 		os.Setenv("XDG_DATA_HOME", oldXDG)
+		if oldVault == "" {
+			os.Unsetenv("DREDGE_VAULT")
+		} else {
+			os.Setenv("DREDGE_VAULT", oldVault)
+		}
+		SetVaultOverride("")
 		os.RemoveAll(tmpDir)
 		_ = crypto.ClearSession()
 	}
@@ -44,6 +53,68 @@ func TestGetDredgeDir(t *testing.T) {
 	expected := filepath.Join(tmpDir, "dredge")
 	if dir != expected {
 		t.Errorf("GetDredgeDir() = %q, want %q", dir, expected)
+	}
+}
+
+func TestGetDredgeDir_ActivePath(t *testing.T) {
+	cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	tmpDir := os.Getenv("XDG_DATA_HOME")
+	vault := filepath.Join(tmpDir, "my-vault")
+
+	if err := SetActivePath(vault); err != nil {
+		t.Fatalf("SetActivePath failed: %v", err)
+	}
+
+	dir, err := GetDredgeDir()
+	if err != nil {
+		t.Fatalf("GetDredgeDir() failed: %v", err)
+	}
+
+	if dir != vault {
+		t.Errorf("GetDredgeDir() = %q, want %q", dir, vault)
+	}
+}
+
+func TestGetDredgeDir_EnvOverride(t *testing.T) {
+	cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	tmpDir := os.Getenv("XDG_DATA_HOME")
+	vault := filepath.Join(tmpDir, "env-vault")
+	os.Setenv("DREDGE_VAULT", vault)
+
+	dir, err := GetDredgeDir()
+	if err != nil {
+		t.Fatalf("GetDredgeDir() failed: %v", err)
+	}
+	if dir != vault {
+		t.Errorf("GetDredgeDir() = %q, want %q", dir, vault)
+	}
+}
+
+func TestGetDredgeDir_OverridePrecedence(t *testing.T) {
+	cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	tmpDir := os.Getenv("XDG_DATA_HOME")
+	active := filepath.Join(tmpDir, "active-vault")
+	env := filepath.Join(tmpDir, "env-vault")
+	override := filepath.Join(tmpDir, "override-vault")
+
+	if err := SetActivePath(active); err != nil {
+		t.Fatalf("SetActivePath failed: %v", err)
+	}
+	os.Setenv("DREDGE_VAULT", env)
+	SetVaultOverride(override)
+
+	dir, err := GetDredgeDir()
+	if err != nil {
+		t.Fatalf("GetDredgeDir() failed: %v", err)
+	}
+	if dir != override {
+		t.Errorf("GetDredgeDir() = %q, want %q", dir, override)
 	}
 }
 

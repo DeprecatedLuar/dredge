@@ -208,6 +208,21 @@ So your entire vault shares the same derived key (this means if you lose your ke
 └── links.json                  ← symlink manifest
 ```
 
+### Vault location
+
+Dredge keeps a pointer to your active vault in an XDG registry file. You can move your vault anywhere and activate it.
+
+Note: this feature was vibe coded.
+
+```bash
+# Persistently set the active vault
+dredge use ~/vaults/personal
+
+# Or override for a single command (does not persist)
+dredge --vault ~/vaults/work ls
+DREDGE_VAULT=~/vaults/work dredge search ssh
+```
+
 So all your encrypted files and `.dredge-key` are stored on the git repo, all the plain text files (the one you decided to make readable by the system) will never be tracked. so do whatever you want wit it. 
 
 ### Session model
@@ -296,6 +311,7 @@ This is _actually_ the reason I built dredge. My SSH config is identical on ever
 | Command | Description | Example |
 |:--------|:------------|:--------|
 | `add` / `a` / `new` / `+` | Add an item (opens editor if no -c flag) | `dredge add "OpenAI Key" -c "sk-..." -t keys` |
+| `use` / `activate` | Set the active vault directory | `dredge use ~/vaults/personal` |
 | `search` / `s` | Search items | `dredge search aws key` |
 | `list` / `ls` | List all items | `dredge ls` |
 | `view` / `v` | View an item | `dredge view xKP` or `dredge 1` |

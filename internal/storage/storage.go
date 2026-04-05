@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -18,6 +19,7 @@ const (
 
 	// Environment variables
 	xdgDataHomeEnv = "XDG_DATA_HOME"
+	vaultDirEnv    = "DREDGE_VAULT"
 
 	// Default paths
 	defaultLocalDir = ".local"
@@ -42,6 +44,52 @@ const (
 	// Gitignore content
 	gitignoreContent = ".spawned/\nlinks.json\n"
 )
+
+var (
+	vaultOverrideMu sync.RWMutex
+	vaultOverride   string
+)
+
+// SetVaultOverride sets a process-local vault directory override.
+// Empty string clears the override.
+func SetVaultOverride(path string) {
+	vaultOverrideMu.Lock()
+	defer vaultOverrideMu.Unlock()
+	vaultOverride = path
+}
+
+func getVaultOverride() string {
+	vaultOverrideMu.RLock()
+	defer vaultOverrideMu.RUnlock()
+	return vaultOverride
+}
+
+// resolvePath expands leading "~/" (or "~") and returns an absolute path.
+// Only supports current-user tilde expansion.
+func resolvePath(p string) (string, error) {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "", nil
+	}
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to expand ~: %w", err)
+		}
+		if p == "~" {
+			p = home
+		} else {
+			p = filepath.Join(home, p[2:])
+		}
+	} else if strings.HasPrefix(p, "~") {
+		return "", fmt.Errorf("unsupported ~ expansion in path: %q", p)
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve path %q: %w", p, err)
+	}
+	return abs, nil
+}
 
 // ItemType represents the type of content stored in an item
 type ItemType string
@@ -152,12 +200,20 @@ func SetActivePath(path string) error {
 // GetDredgeDir returns the active vault directory path.
 // If no active vault is set, falls back to the registry directory (backward compat).
 func GetDredgeDir() (string, error) {
+	if ov := getVaultOverride(); strings.TrimSpace(ov) != "" {
+		return resolvePath(ov)
+	}
+
+	if env := os.Getenv(vaultDirEnv); strings.TrimSpace(env) != "" {
+		return resolvePath(env)
+	}
+
 	active, err := GetActivePath()
 	if err != nil {
 		return "", err
 	}
-	if active != "" {
-		return active, nil
+	if strings.TrimSpace(active) != "" {
+		return resolvePath(active)
 	}
 	return GetRegistryDir()
 }
@@ -503,4 +559,3 @@ func ItemExists(id string) (bool, error) {
 	}
 	return false, fmt.Errorf("failed to check item existence: %w", err)
 }
-

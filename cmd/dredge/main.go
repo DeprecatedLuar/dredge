@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -36,6 +37,11 @@ func main() {
 				Aliases: []string{"p"},
 				Usage:   "Password for decryption (skips prompt)",
 			},
+			&cli.StringFlag{
+				Name:    "vault",
+				Usage:   "Vault directory to use for this command (does not persist)",
+				EnvVars: []string{"DREDGE_VAULT"},
+			},
 			&cli.BoolFlag{
 				Name:        "debug",
 				Usage:       "Enable debug output",
@@ -59,6 +65,14 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
+			{
+				Name:    "use",
+				Aliases: []string{"activate"},
+				Usage:   "Set the active vault directory",
+				Action: func(c *cli.Context) error {
+					return commands.HandleUse(c.Args().Slice())
+				},
+			},
 			{
 				Name:                   "add",
 				Aliases:                []string{"a", "new", "+"},
@@ -238,6 +252,14 @@ func main() {
 		},
 		Before: func(c *cli.Context) error {
 			// Register active vault path — must be first (used by session key scoping and verify file)
+			if vault := strings.TrimSpace(c.String("vault")); vault != "" {
+				if abs, err := resolveUserPath(vault); err == nil {
+					storage.SetVaultOverride(abs)
+					session.SetVaultPath(abs)
+				} else {
+					return err
+				}
+			}
 			if vaultDir, err := storage.GetDredgeDir(); err == nil {
 				session.SetVaultPath(vaultDir)
 			}
@@ -277,7 +299,7 @@ func main() {
 			sub := c.Args().First()
 
 			// Commands that don't need vault access
-			passiveCommands := []string{"", "help", "h", "update", "up", "init", "lock"}
+			passiveCommands := []string{"", "help", "h", "update", "up", "init", "lock", "use", "activate"}
 
 			contains := func(list []string, s string) bool {
 				for _, v := range list {
@@ -342,6 +364,31 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func resolveUserPath(p string) (string, error) {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "", fmt.Errorf("empty path")
+	}
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to expand ~: %w", err)
+		}
+		if p == "~" {
+			p = home
+		} else {
+			p = filepath.Join(home, p[2:])
+		}
+	} else if strings.HasPrefix(p, "~") {
+		return "", fmt.Errorf("unsupported ~ expansion in path: %q", p)
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve path %q: %w", p, err)
+	}
+	return abs, nil
 }
 
 func Debugf(format string, args ...any) {
