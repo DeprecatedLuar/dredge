@@ -24,7 +24,10 @@ jobs:
         run: go vet ./...
 
       - name: Go test
-        run: go test ./...
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
 
       - name: Go build
         run: go build ./cmd/dredge
