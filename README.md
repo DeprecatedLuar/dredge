@@ -3,6 +3,9 @@
 <div align="center">
 <img src="other/assets/dredge-doge-vs-cheems-banner.webp" alt="dredge-doge-vs-cheems"/>
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/DeprecatedLuar/dredge)](https://goreportcard.com/report/github.com/DeprecatedLuar/dredge)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/DeprecatedLuar/dredge?logo=go&logoColor=white&color=00ADD8)](https://go.dev)
+
 <div align="center">
 
 [Install](#install) • [Quick Start](#quick-start) • [Features](#features) • [The Link Command](#link) • [Commands](#commands) • [How It Works](#how-it-works) • [Security](#security) • [Why](#why)
