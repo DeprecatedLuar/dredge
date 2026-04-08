@@ -5,6 +5,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/DeprecatedLuar/dredge)](https://goreportcard.com/report/github.com/DeprecatedLuar/dredge)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/DeprecatedLuar/dredge?logo=go&logoColor=white&color=00ADD8)](https://go.dev)
+[![codecov](https://codecov.io/gh/DeprecatedLuar/dredge/graph/badge.svg)](https://codecov.io/gh/DeprecatedLuar/dredge)
 
 <div align="center">
 
